@@ -384,16 +384,17 @@ struct cam_ife_csid_hw_counters {
 /*
  * struct cam_ife_csid_debug_info: place holder for csid debug
  *
- * @debug_val:             Debug val for enabled features
- * @rx_capture_vc:         rx packet vc capture
- * @rx_capture_dt:         rx packet dt capture
- * @rst_capture_strobes:   rx packet capture rst strobes
- * @top_mask:              Debug mask for top irq
- * @rx_mask:               Debug mask for rx irq
- * @path_mask:             Debug mask for path irq
- * @test_bus_val:          CSID test bus value
- * @rx_capture_debug_set:  rx pkt capture debug set
- * @test_bus_enabled:      test bus enabled
+ * @debug_val:               Debug val for enabled features
+ * @rx_capture_vc:           rx packet vc capture
+ * @rx_capture_dt:           rx packet dt capture
+ * @rst_capture_strobes:     rx packet capture rst strobes
+ * @top_mask:                Debug mask for top irq
+ * @rx_mask:                 Debug mask for rx irq
+ * @path_mask:               Debug mask for path irq
+ * @test_bus_val:            CSID test bus value
+ * @rx_capture_debug_set:    rx pkt capture debug set
+ * @test_bus_enabled:        test bus enabled
+ * @enable_cdr_sweep_debug:  If CDR sweep for CSIPHY is enabled
  */
 struct cam_ife_csid_debug_info {
 	uint32_t                          debug_val;
@@ -406,6 +407,7 @@ struct cam_ife_csid_debug_info {
 	uint32_t                          test_bus_val;
 	bool                              rx_capture_debug_set;
 	bool                              test_bus_enabled;
+	bool                              cdr_sweep_debug_enabled;
 };
 
 /*

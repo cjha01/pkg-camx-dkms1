@@ -68,6 +68,7 @@ enum cam_ife_ctx_master_type {
  * @enable_cdm_cmd_check:      Enable invalid command check in cmd_buf
  * @disable_line_based_mode:   Disable line based mode for per port
  *                             feature with duplicate sensors
+ * @enable_cdr_sweep_debug:    If CDR sweep for CSIPHY is enabled
  */
 struct cam_ife_hw_mgr_debug {
 	struct dentry  *dentry;
@@ -92,6 +93,7 @@ struct cam_ife_hw_mgr_debug {
 	bool           enable_presil_reg_dump;
 	bool           enable_cdm_cmd_check;
 	bool           disable_line_based_mode;
+	bool           enable_cdr_sweep_debug;
 };
 
 /**
