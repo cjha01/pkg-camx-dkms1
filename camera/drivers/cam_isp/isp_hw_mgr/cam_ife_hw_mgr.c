@@ -18748,7 +18748,7 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 			ife_mgr_ctx->ctx_in_use = true;
 			ife_mgr_ctx->ctx_idx = i;
 			ife_mgr_ctx->is_offline = false;
-			ife_mgr_ctx->stop_done = false;
+			ife_mgr_ctx->stop_state = CAM_IFE_CTX_STOP_NONE;
 			break;
 		}
 	}
@@ -18937,6 +18937,7 @@ static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 		 * complex HW allocation.
 		 */
 		mutex_lock(&ife_hw_mgr->ctx_mutex);
+		hw_mgr_ctx->stop_state = CAM_IFE_CTX_STOP_IN_PROGRESS;
 		cam_ife_mgr_flush_in_queue(ife_hw_mgr,
 			hw_mgr_ctx->ctx_idx, false, -1);
 
@@ -18952,7 +18953,7 @@ static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 				CAM_ERR(CAM_ISP, "Offline IFE busy on stop!");
 		}
 
-		hw_mgr_ctx->stop_done = true;
+		hw_mgr_ctx->stop_state = CAM_IFE_CTX_STOP_DONE;
 		hw_mgr_ctx->concr_ctx = c_ctx;
 		if (c_ctx) {
 			atomic_set(&c_ctx->ctx_state,
@@ -18996,7 +18997,7 @@ static int cam_ife_mgr_v_release_hw(void *hw_mgr_priv, void *release_hw_args)
 		}
 	}
 	rc = cam_ife_mgr_release_hw(hw_mgr_priv, release_hw_args);
-	hw_mgr_ctx->stop_done = false;
+	hw_mgr_ctx->stop_state = CAM_IFE_CTX_STOP_NONE;
 	hw_mgr_ctx->ctx_in_use = false;
 	hw_mgr_ctx->is_offline = false;
 	return rc;
