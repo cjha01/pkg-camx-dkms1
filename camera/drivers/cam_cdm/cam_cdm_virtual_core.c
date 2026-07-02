@@ -260,7 +260,7 @@ int cam_virtual_cdm_probe(struct platform_device *pdev)
 		goto soc_load_failed;
 	}
 
-	rc = cam_cdm_soc_load_dt_private(pdev, cdm_hw->soc_info.soc_private);
+	rc = cam_cdm_soc_load_dt_private(pdev, cdm_hw->soc_info.soc_private, 0);
 	if (rc) {
 		CAM_ERR(CAM_CDM, "Failed to load CDM dt private data");
 		kfree(cdm_hw->soc_info.soc_private);
