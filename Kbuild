@@ -236,6 +236,7 @@ camera_$(CAMERA_ARCH)-y := \
 	camera_kt/drivers/cam_req_mgr/cam_mem_mgr.o \
 	camera_kt/drivers/cam_smmu/cam_smmu_api.o \
 	common/cam_common_util.o \
+	common/cam_icp_util.o \
 	common/cam_compat.o \
 	common/cam_debug_util.o \
 	common/cam_io_util.o \
@@ -471,6 +472,7 @@ camera_$(CAMERA_ARCH)-y := \
 	camera/drivers/cam_cdm/cam_cdm_hw_core.o \
 	camera/drivers/cam_smmu/cam_smmu_api.o \
 	common/cam_common_util.o \
+	common/cam_icp_util.o \
 	common/cam_compat.o \
 	common/cam_debug_util.o \
 	common/cam_io_util.o \

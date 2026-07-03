@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef CAM_A5_CORE_H
@@ -11,6 +12,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include "cam_a5_hw_intf.h"
+#include "cam_icp_util.h"
 
 #define A5_QGIC_BASE            0
 #define A5_SIERRA_BASE          1

@@ -828,6 +828,18 @@ int cam_cpas_get_hw_info(
 int cam_cpas_get_cpas_hw_version(uint32_t *hw_version);
 
 /**
+ * cam_cpas_get_target_name()
+ *
+ * @brief: API to get target name mapped for current cpas hw version
+ *
+ * @target_name : Target name string pointer
+ *
+ * @return 0 on success.
+ *
+ */
+int cam_cpas_get_target_name(const char **target_name);
+
+/**
  * cam_cpas_is_feature_supported()
  *
  * @brief: API to get camera features

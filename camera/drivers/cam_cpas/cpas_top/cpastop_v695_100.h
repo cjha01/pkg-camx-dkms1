@@ -1213,5 +1213,6 @@ static struct cam_cpas_info cam695_cpas100_cpas_info = {
 	},
 	.qchannel_info = {&cam695_cpas100_qchannel_info},
 	.num_qchannel = 1,
+	.target_name = "x1e80100",
 };
 #endif /* _CPASTOP_V695_100_H_ */

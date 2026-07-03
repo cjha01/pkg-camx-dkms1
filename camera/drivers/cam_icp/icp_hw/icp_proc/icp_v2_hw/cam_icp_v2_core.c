@@ -21,6 +21,7 @@
 #include "hfi_intf.h"
 #include "hfi_sys_defs.h"
 #include "cam_icp_proc_common.h"
+#include "cam_icp_util.h"
 #include "cam_icp_v2_core.h"
 #include "cam_common_util.h"
 #include "cam_compat.h"
@@ -29,8 +30,6 @@
 
 #define TZ_STATE_SUSPEND 0
 #define TZ_STATE_RESUME  1
-
-#define ICP_FW_NAME_MAX_SIZE    32
 
 #define ICP_V2_IRQ_TEST_TIMEOUT 1000
 
@@ -463,13 +462,14 @@ static int32_t __cam_non_sec_load_fw(void *device_priv)
 {
 	int32_t rc = 0;
 	uint32_t fw_size;
-	char firmware_name[ICP_FW_NAME_MAX_SIZE] = {0};
+	int num_candidates;
 	const char               *fw_name;
 	const uint8_t            *fw_start = NULL;
 	struct cam_hw_info       *icp_v2_dev = device_priv;
 	struct cam_hw_soc_info   *soc_info = NULL;
 	struct cam_icp_v2_core_info *core_info = NULL;
 	struct platform_device   *pdev = NULL;
+	struct cam_icp_fw_candidate candidates[ICP_FW_MAX_CANDIDATES];
 
 	if (!device_priv) {
 		CAM_ERR(CAM_ICP, "Invalid cam_dev_info");
@@ -488,25 +488,21 @@ static int32_t __cam_non_sec_load_fw(void *device_priv)
 
 	rc = of_property_read_string(pdev->dev.of_node, "fw_name",
 		&fw_name);
-	if (rc) {
-		CAM_ERR(CAM_ICP, "FW image name not found");
-		return rc;
+	if (rc)
+		fw_name = NULL;
+
+	num_candidates = cam_icp_get_fw_candidates(fw_name,
+		".elf", candidates, ARRAY_SIZE(candidates));
+	if (num_candidates < 0) {
+		CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
+				num_candidates);
+		return num_candidates;
 	}
 
-	/* Account for ".elf" size [4 characters] */
-	if (strlen(fw_name) >= (ICP_FW_NAME_MAX_SIZE - 4)) {
-		CAM_ERR(CAM_ICP, "Invalid fw name %s", fw_name);
-		return -EINVAL;
-	}
-
-	scnprintf(firmware_name, ARRAY_SIZE(firmware_name),
-		"%s.elf", fw_name);
-
-	rc = firmware_request_nowarn(&core_info->fw_params.fw_elf,
-		firmware_name, &pdev->dev);
-	if (rc) {
-		CAM_ERR(CAM_ICP, "Failed to locate %s fw: %d",
-			firmware_name, rc);
+	rc = cam_icp_request_fw_from_candidates(&pdev->dev,
+		candidates, num_candidates, &core_info->fw_params.fw_elf);
+	if (rc < 0) {
+		CAM_ERR(CAM_ICP, "Failed to locate firmware");
 		return rc;
 	}
 
@@ -618,15 +614,17 @@ static int __load_firmware(struct platform_device *pdev,
 {
 	const char *fw_name;
 	const struct firmware *firmware = NULL;
-	char firmware_name[ICP_FW_NAME_MAX_SIZE] = {0};
 	struct device_node *node;
 	struct resource res;
+	struct cam_icp_fw_candidate candidates[ICP_FW_MAX_CANDIDATES];
 	phys_addr_t res_start;
 	size_t res_size;
 	ssize_t fw_size;
 	devm_qcom_scm_pas_context_alloc_t fn_devm_qcom_scm_pas_context_alloc = NULL;
 	qcom_mdt_pas_load_t fn_qcom_mdt_pas_load = NULL;
 	int rc;
+	int num_candidates;
+	int selected_idx = -1;
 #if !IS_ENABLED(CONFIG_QCOM_PAS)
 	qcom_scm_pas_metadata_release_t fn_qcom_scm_pas_metadata_release = NULL;
 #endif
@@ -638,43 +636,40 @@ static int __load_firmware(struct platform_device *pdev,
 
 	rc = of_property_read_string(pdev->dev.of_node, "fw_name",
 		&fw_name);
-	if (rc) {
-		CAM_ERR(CAM_ICP, "FW image name not found");
-		return rc;
+	if (rc)
+		fw_name = NULL;
+
+	num_candidates = cam_icp_get_fw_candidates(fw_name,
+		".mbn", candidates, ARRAY_SIZE(candidates));
+	if (num_candidates < 0) {
+		CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
+			num_candidates);
+		return num_candidates;
 	}
 
-	/* Account for ".mdt" size [4 characters] */
-	if (strlen(fw_name) >= (ICP_FW_NAME_MAX_SIZE - 4)) {
-		CAM_ERR(CAM_ICP, "Invalid fw name %s", fw_name);
-		return -EINVAL;
+	selected_idx = cam_icp_request_fw_from_candidates(&pdev->dev,
+		candidates, num_candidates, &firmware);
+	if (selected_idx < 0) {
+		CAM_ERR(CAM_ICP, "Failed to locate firmware");
+		return selected_idx;
 	}
-
-	scnprintf(firmware_name, ARRAY_SIZE(firmware_name),
-		"%s.mbn", fw_name);
 
 	node = of_parse_phandle(pdev->dev.of_node, "memory-region", 0);
 	if (!node) {
 		CAM_ERR(CAM_ICP, "firmware memory region not found");
-		return -ENODEV;
+		rc = -ENODEV;
+		goto out;
 	}
 
 	rc = of_address_to_resource(node, 0, &res);
 	of_node_put(node);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "missing firmware resource address rc=%d", rc);
-		return rc;
+		goto out;
 	}
 
 	res_start = res.start;
 	res_size = (size_t)resource_size(&res);
-
-	rc = firmware_request_nowarn(&firmware, firmware_name, &pdev->dev);
-	if (rc) {
-		CAM_ERR(CAM_ICP,
-			"error requesting %s firmware rc=%d",
-			firmware_name, rc);
-		return rc;
-	}
 
 	/* Make sure carveout and binary sizes are compatible */
 	fw_size = qcom_mdt_get_size(firmware);
@@ -697,7 +692,8 @@ static int __load_firmware(struct platform_device *pdev,
 	if (!fn_devm_qcom_scm_pas_context_alloc) {
 		CAM_ERR(CAM_ICP,
 				"SCM PAS context alloc symbol not available");
-		return -EOPNOTSUPP;
+		rc = -EOPNOTSUPP;
+		goto out;
 	}
 
 	fw->ctx = fn_devm_qcom_scm_pas_context_alloc
@@ -721,7 +717,8 @@ static int __load_firmware(struct platform_device *pdev,
 		return -EOPNOTSUPP;
 	}
 
-	rc = fn_qcom_mdt_pas_load(fw->ctx, firmware, firmware_name, NULL);
+	rc = fn_qcom_mdt_pas_load(fw->ctx, firmware,
+		candidates[selected_idx].name, NULL);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "failed to load firmware rc=%d", rc);
 		fw->ctx = NULL;

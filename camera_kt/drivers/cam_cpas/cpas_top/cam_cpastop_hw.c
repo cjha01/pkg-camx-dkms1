@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/delay.h>
@@ -37,6 +38,7 @@
 #include "cam_common_util.h"
 
 struct cam_camnoc_info *camnoc_info;
+struct cam_cpas_info *cpas_info;
 struct cam_cpas_camnoc_qchannel *qchannel_info;
 
 
@@ -887,7 +889,9 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 {
 	int rc = 0;
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
+	struct cam_cpas *cpas_core = (struct cam_cpas *)cpas_hw->core_info;
 	qchannel_info = NULL;
+	cpas_info = NULL;
 
 	CAM_DBG(CAM_CPAS,
 		"hw_version=0x%x Camera Version %d.%d.%d, cpas version %d.%d.%d",
@@ -959,6 +963,7 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 		camnoc_info = &cam680_cpas100_camnoc_info;
 		break;
 	case CAM_CPAS_TITAN_165_V100:
+		cpas_info = &cam165_cpas100_cpas_info;
 		camnoc_info = &cam165_cpas100_camnoc_info;
 		break;
 	default:
@@ -969,6 +974,9 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 		rc = -EINVAL;
 		break;
 	}
+
+	if (cpas_info && cpas_info->target_name)
+		cpas_core->target_name = cpas_info->target_name;
 
 	return 0;
 }

@@ -262,6 +262,7 @@ struct cam_cpas_monitor {
  * @monitor_head: Monitor array head
  * @monitor_entries: cpas monitor array
  * @full_state_dump: Whether to enable full cpas state dump or not
+ * @target_name: Target directory name for firmware lookup
  */
 struct cam_cpas {
 	struct cam_cpas_hw_caps hw_caps;
@@ -287,6 +288,7 @@ struct cam_cpas {
 	atomic64_t  monitor_head;
 	struct cam_cpas_monitor monitor_entries[CAM_CPAS_MONITOR_MAX_ENTRIES];
 	bool full_state_dump;
+	const char *target_name;
 };
 
 int cam_camsstop_get_internal_ops(struct cam_cpas_internal_ops *internal_ops);

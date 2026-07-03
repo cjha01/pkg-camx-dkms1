@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CPASTOP_V692_100_H_
@@ -449,6 +449,7 @@ static struct cam_cpas_info cam692_cpas100_cpas_info = {
 	},
 	.qchannel_info = {&cam692_cpas100_qchannel_info},
 	.num_qchannel = 1,
+	.target_name = "qcs8300",
 };
 
 #endif /* _CPASTOP_V692_100_H_ */
