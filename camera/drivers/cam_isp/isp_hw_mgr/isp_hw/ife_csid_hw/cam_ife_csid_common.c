@@ -42,6 +42,17 @@ const uint8_t *cam_ife_csid_irq_reg_tag[CAM_IFE_CSID_IRQ_REG_MAX] = {
 	"UDI0",
 	"UDI1",
 	"UDI2",
+	"TOP_2",
+	"RX_2",
+	"IPP_1",
+	"IPP_2",
+	"IPP_3",
+	"RDI6",
+	"RDI7",
+	"RDI8",
+	"RDI9",
+	"RDI10",
+	"RDI11",
 };
 
 static int cam_ife_csid_get_cid(struct cam_ife_csid_cid_data *cid_data,
@@ -83,6 +94,77 @@ static int cam_ife_csid_get_cid(struct cam_ife_csid_cid_data *cid_data,
 	}
 
 	return -EINVAL;
+}
+
+bool cam_ife_csid_is_rdi_res_id(uint32_t res_id)
+{
+	switch (res_id) {
+	case CAM_IFE_PIX_PATH_RES_RDI_0:
+	case CAM_IFE_PIX_PATH_RES_RDI_1:
+	case CAM_IFE_PIX_PATH_RES_RDI_2:
+	case CAM_IFE_PIX_PATH_RES_RDI_3:
+	case CAM_IFE_PIX_PATH_RES_RDI_4:
+	case CAM_IFE_PIX_PATH_RES_RDI_5:
+	case CAM_IFE_PIX_PATH_RES_RDI_6:
+	case CAM_IFE_PIX_PATH_RES_RDI_7:
+	case CAM_IFE_PIX_PATH_RES_RDI_8:
+	case CAM_IFE_PIX_PATH_RES_RDI_9:
+	case CAM_IFE_PIX_PATH_RES_RDI_10:
+	case CAM_IFE_PIX_PATH_RES_RDI_11:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool cam_ife_csid_get_rdi_res_id_from_index(uint32_t rdi_idx,
+	uint32_t *res_id)
+{
+	if (!res_id)
+		return false;
+
+	switch (rdi_idx) {
+	case 0:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_0;
+		break;
+	case 1:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_1;
+		break;
+	case 2:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_2;
+		break;
+	case 3:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_3;
+		break;
+	case 4:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_4;
+		break;
+	case 5:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_5;
+		break;
+	case 6:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_6;
+		break;
+	case 7:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_7;
+		break;
+	case 8:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_8;
+		break;
+	case 9:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_9;
+		break;
+	case 10:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_10;
+		break;
+	case 11:
+		*res_id = CAM_IFE_PIX_PATH_RES_RDI_11;
+		break;
+	default:
+		return false;
+	}
+
+	return true;
 }
 
 int cam_ife_csid_is_pix_res_format_supported(
@@ -609,8 +691,26 @@ int cam_ife_csid_convert_res_to_irq_reg(uint32_t res_id)
 		return CAM_IFE_CSID_IRQ_REG_RDI_4;
 	case CAM_IFE_PIX_PATH_RES_RDI_5:
 		return CAM_IFE_CSID_IRQ_REG_RDI_5;
+	case CAM_IFE_PIX_PATH_RES_RDI_6:
+		return CAM_IFE_CSID_IRQ_REG_RDI_6;
+	case CAM_IFE_PIX_PATH_RES_RDI_7:
+		return CAM_IFE_CSID_IRQ_REG_RDI_7;
+	case CAM_IFE_PIX_PATH_RES_RDI_8:
+		return CAM_IFE_CSID_IRQ_REG_RDI_8;
+	case CAM_IFE_PIX_PATH_RES_RDI_9:
+		return CAM_IFE_CSID_IRQ_REG_RDI_9;
+	case CAM_IFE_PIX_PATH_RES_RDI_10:
+		return CAM_IFE_CSID_IRQ_REG_RDI_10;
+	case CAM_IFE_PIX_PATH_RES_RDI_11:
+		return CAM_IFE_CSID_IRQ_REG_RDI_11;
 	case CAM_IFE_PIX_PATH_RES_IPP:
 		return CAM_IFE_CSID_IRQ_REG_IPP;
+	case CAM_IFE_PIX_PATH_RES_IPP_1:
+		return CAM_IFE_CSID_IRQ_REG_IPP_1;
+	case CAM_IFE_PIX_PATH_RES_IPP_2:
+		return CAM_IFE_CSID_IRQ_REG_IPP_2;
+	case CAM_IFE_PIX_PATH_RES_IPP_3:
+		return CAM_IFE_CSID_IRQ_REG_IPP_3;
 	case CAM_IFE_PIX_PATH_RES_PPP:
 		return CAM_IFE_CSID_IRQ_REG_PPP;
 	case CAM_IFE_PIX_PATH_RES_UDI_0:
