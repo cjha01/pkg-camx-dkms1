@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __UAPI_CAM_ISP_IFE_H__
@@ -64,6 +64,17 @@
 #define CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI3         (CAM_ISP_IFE_OUT_RES_BASE + 51)
 #define CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI4         (CAM_ISP_IFE_OUT_RES_BASE + 52)
 #define CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI5         (CAM_ISP_IFE_OUT_RES_BASE + 53)
+#define CAM_ISP_IFE_OUT_RES_STATS_BG_IRC_AEC     (CAM_ISP_IFE_OUT_RES_BASE + 54)
+#define CAM_ISP_IFE_OUT_RES_STATS_BHIST_IRC_AEC  (CAM_ISP_IFE_OUT_RES_BASE + 55)
+#define CAM_ISP_IFE_OUT_RES_STATS_AEC_BG         (CAM_ISP_IFE_OUT_RES_BASE + 56)
+#define CAM_ISP_IFE_OUT_RES_RDI_6                (CAM_ISP_IFE_OUT_RES_BASE + 57)
+#define CAM_ISP_IFE_OUT_RES_RDI_7                (CAM_ISP_IFE_OUT_RES_BASE + 58)
+#define CAM_ISP_IFE_OUT_RES_RDI_8                (CAM_ISP_IFE_OUT_RES_BASE + 59)
+#define CAM_ISP_IFE_OUT_RES_RDI_9                (CAM_ISP_IFE_OUT_RES_BASE + 60)
+#define CAM_ISP_IFE_OUT_RES_RDI_10               (CAM_ISP_IFE_OUT_RES_BASE + 61)
+#define CAM_ISP_IFE_OUT_RES_RDI_11               (CAM_ISP_IFE_OUT_RES_BASE + 62)
+#define CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI6         (CAM_ISP_IFE_OUT_RES_BASE + 63)
+#define CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI7         (CAM_ISP_IFE_OUT_RES_BASE + 64)
 
 /* IFE input port resource type (global unique) */
 #define CAM_ISP_IFE_IN_RES_BASE                 0x4000
