@@ -44,6 +44,7 @@
 #include "cpastop_v665_100.h"
 #include "cpastop_v690_100.h"
 #include "cpastop_v692_100.h"
+#include "cpastop_v900_100.h"
 #include "cpastop_v695_100.h"
 #include "cpastop_v695_110.h"
 #include "cpastop_v696_100.h"
@@ -294,6 +295,16 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 	},
+	/* for camera_900 */
+	{
+		CAM_CPAS_TITAN_900_V100,
+		0,
+		CAM_CPAS_TITAN_900_V110,
+		0,
+		0,
+		0,
+		0,
+	},
 	};
 
 static char *cam_cpastop_get_camnoc_name(enum cam_camnoc_hw_type type)
@@ -389,6 +400,9 @@ static int cam_cpas_translate_camera_cpas_version_id(
 		break;
 	case CAM_CPAS_CAMERA_VERSION_692:
 		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_692;
+		break;
+	case CAM_CPAS_CAMERA_VERSION_900:
+		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_900;
 		break;
 	case CAM_CPAS_CAMERA_VERSION_695:
 		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_695;
@@ -1300,13 +1314,13 @@ static int cam_cpastop_set_up_camnoc_info(struct cam_cpas *cpas_core,
 
 			switch (i) {
 			case CAM_CAMNOC_HW_COMBINED:
-				camnoc_info[i]->reg_base = CAM_CPAS_REG_CAMNOC;
+				alloc_camnoc[i]->reg_base = CAM_CPAS_REG_CAMNOC;
 				break;
 			case CAM_CAMNOC_HW_RT:
-				camnoc_info[i]->reg_base = CAM_CPAS_REG_CAMNOC_RT;
+				alloc_camnoc[i]->reg_base = CAM_CPAS_REG_CAMNOC_RT;
 				break;
 			case CAM_CAMNOC_HW_NRT:
-				camnoc_info[i]->reg_base = CAM_CPAS_REG_CAMNOC_NRT;
+				alloc_camnoc[i]->reg_base = CAM_CPAS_REG_CAMNOC_NRT;
 				break;
 			default:
 				CAM_ERR(CAM_CPAS, "Invalid camnoc type %u", i);
@@ -1315,9 +1329,9 @@ static int cam_cpastop_set_up_camnoc_info(struct cam_cpas *cpas_core,
 
 			camnoc_cnt++;
 
-			if (cpas_core->regbase_index[camnoc_info[i]->reg_base] == -1) {
+			if (cpas_core->regbase_index[alloc_camnoc[i]->reg_base] == -1) {
 				CAM_ERR(CAM_CPAS, "Regbase not set up for %s",
-					camnoc_info[i]->camnoc_name);
+					alloc_camnoc[i]->camnoc_name);
 				return -EINVAL;
 			}
 		} else {
@@ -1564,6 +1578,16 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 	case CAM_CPAS_TITAN_692_V100:
 		alloc_camnoc_info[CAM_CAMNOC_HW_COMBINED] = &cam692_cpas100_camnoc_info;
 		cpas_info = &cam692_cpas100_cpas_info;
+		break;
+	case CAM_CPAS_TITAN_900_V100:
+		alloc_camnoc_info[CAM_CAMNOC_HW_RT] = &cam900_cpas100_camnoc_info_rt;
+		alloc_camnoc_info[CAM_CAMNOC_HW_NRT] = &cam900_cpas100_camnoc_info_nrt;
+		cpas_info = &cam900_cpas100_cpas_info;
+		break;
+	case CAM_CPAS_TITAN_900_V110:
+		alloc_camnoc_info[CAM_CAMNOC_HW_RT] = &cam900_cpas100_camnoc_info_rt;
+		alloc_camnoc_info[CAM_CAMNOC_HW_NRT] = &cam900_cpas100_camnoc_info_nrt;
+		cpas_info = &cam900_cpas100_cpas_info;
 		break;
 	case CAM_CPAS_TITAN_695_V100:
 		alloc_camnoc_info[CAM_CAMNOC_HW_COMBINED] = &cam695_cpas100_camnoc_info;
