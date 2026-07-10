@@ -951,6 +951,8 @@ int cam_ife_hw_mgr_get_res(struct list_head *src_list, struct cam_isp_hw_mgr_res
 int cam_ife_hw_mgr_event_handler(void *priv, uint32_t evt_id, void *evt_info);
 int cam_ife_hw_mgr_put_res(struct list_head *src_list, struct cam_isp_hw_mgr_res  **res);
 int cam_ife_hw_mgr_is_rdi_res(uint32_t res_id);
+bool cam_ife_hw_mgr_is_csid_rdi_path(uint32_t res_id);
+bool cam_ife_hw_mgr_is_virtual_rdi_out_res(uint32_t res_id);
 bool cam_isp_is_ctx_primary_rdi(struct cam_ife_hw_mgr_ctx  *ctx);
 bool cam_ife_hw_mgr_is_ife_out_port(uint32_t res_id);
 bool cam_ife_hw_mgr_check_path_port_compat(uint32_t in_type, uint32_t out_type);

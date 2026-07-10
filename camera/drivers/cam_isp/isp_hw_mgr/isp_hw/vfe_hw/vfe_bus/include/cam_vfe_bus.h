@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_VFE_BUS_H_
@@ -30,6 +31,7 @@ enum cam_vfe_bus_plane_type {
 	PLANE_Y,
 	PLANE_C,
 	PLANE_C2,
+	PLANE_C3,
 	PLANE_MAX,
 };
 

@@ -16,7 +16,7 @@
 #include "cam_cpas_api.h"
 
 /* MAX IFE instance */
-#define CAM_IFE_HW_NUM_MAX               8
+#define CAM_IFE_HW_NUM_MAX               16
 #define CAM_SFE_HW_NUM_MAX               3
 #define CAM_IFE_RDI_NUM_MAX              4
 #define CAM_SFE_RDI_NUM_MAX              5

@@ -7,7 +7,7 @@
 #ifndef _CAM_VFE_TOP_COMMON_H_
 #define _CAM_VFE_TOP_COMMON_H_
 
-#define CAM_VFE_TOP_MUX_MAX 7
+#define CAM_VFE_TOP_MUX_MAX 13
 
 #include "cam_cpas_api.h"
 #include "cam_vfe_hw_intf.h"

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 
@@ -14,7 +14,7 @@
 #define CAM_VFE_BUS_VER3_MAX_SUB_GRPS        6
 #define CAM_VFE_BUS_VER3_MAX_MID_PER_PORT    4
 #define CAM_VFE_BUS_VER3_CONS_ERR_MAX        32
-#define CAM_VFE_BUS_VER3_MAX_CLIENTS         28
+#define CAM_VFE_BUS_VER3_MAX_CLIENTS         40
 #define CAM_VFE_BUS_VER3_IRQ_MAX             2
 
 enum cam_vfe_bus_ver3_vfe_core_id {
@@ -31,6 +31,12 @@ enum cam_vfe_bus_ver3_src_grp {
 	CAM_VFE_BUS_VER3_SRC_GRP_4,
 	CAM_VFE_BUS_VER3_SRC_GRP_5,
 	CAM_VFE_BUS_VER3_SRC_GRP_6,
+	CAM_VFE_BUS_VER3_SRC_GRP_7,
+	CAM_VFE_BUS_VER3_SRC_GRP_8,
+	CAM_VFE_BUS_VER3_SRC_GRP_9,
+	CAM_VFE_BUS_VER3_SRC_GRP_10,
+	CAM_VFE_BUS_VER3_SRC_GRP_11,
+	CAM_VFE_BUS_VER3_SRC_GRP_12,
 	CAM_VFE_BUS_VER3_SRC_GRP_MAX,
 };
 
@@ -62,6 +68,12 @@ enum cam_vfe_bus_ver3_vfe_out_type {
 	CAM_VFE_BUS_VER3_VFE_OUT_RDI3,
 	CAM_VFE_BUS_VER3_VFE_OUT_RDI4,
 	CAM_VFE_BUS_VER3_VFE_OUT_RDI5,
+	CAM_VFE_BUS_VER3_VFE_OUT_RDI6,
+	CAM_VFE_BUS_VER3_VFE_OUT_RDI7,
+	CAM_VFE_BUS_VER3_VFE_OUT_RDI8,
+	CAM_VFE_BUS_VER3_VFE_OUT_RDI9,
+	CAM_VFE_BUS_VER3_VFE_OUT_RDI10,
+	CAM_VFE_BUS_VER3_VFE_OUT_RDI11,
 	CAM_VFE_BUS_VER3_VFE_OUT_FULL,
 	CAM_VFE_BUS_VER3_VFE_OUT_DS2,
 	CAM_VFE_BUS_VER3_VFE_OUT_DS4,
@@ -103,6 +115,9 @@ enum cam_vfe_bus_ver3_vfe_out_type {
 	CAM_VFE_BUS_VER3_VFE_OUT_AI_OUT_2,
 	CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BG,
 	CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BHIST,
+	CAM_VFE_BUS_VER3_VFE_OUT_STATS_BG_IRC_AEC,
+	CAM_VFE_BUS_VER3_VFE_OUT_STATS_BHIST_IRC_AEC,
+	CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BG,
 	CAM_VFE_BUS_VER3_VFE_OUT_MAX,
 };
 
@@ -138,6 +153,7 @@ struct cam_vfe_bus_ver3_reg_offset_common {
 	uint32_t comp_cfg_0;
 	uint32_t comp_cfg_1;
 	uint32_t ctxt_sel;
+	uint32_t ctxt_rd_sel;
 	uint32_t if_frameheader_cfg[CAM_VFE_BUS_VER3_MAX_SUB_GRPS];
 	uint32_t ubwc_static_ctrl;
 	uint32_t pwr_iso_cfg;
@@ -212,6 +228,7 @@ struct cam_vfe_bus_ver3_reg_offset_bus_client {
 	uint32_t hw_ctxt_cfg;
 	uint32_t bw_limiter_addr;
 	uint32_t comp_group;
+	uint64_t supported_formats;
 };
 
 /*
@@ -281,6 +298,7 @@ struct cam_vfe_bus_ver3_hw_info {
 	bool comp_cfg_needed;
 	uint32_t pack_align_shift;
 	uint32_t max_bw_counter_limit;
+	bool support_burst_limit;
 };
 
 /**

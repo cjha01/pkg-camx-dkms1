@@ -461,6 +461,8 @@ static int cam_ife_mgr_get_rdi_stream_cfg_cnt(
 		case CAM_ISP_VIRTUAL_RDI3_PATH:
 		case CAM_ISP_VIRTUAL_RDI4_PATH:
 		case CAM_ISP_VIRTUAL_RDI5_PATH:
+		case CAM_ISP_VIRTUAL_RDI6_PATH:
+		case CAM_ISP_VIRTUAL_RDI7_PATH:
 			cnt++;
 			CAM_DBG(CAM_ISP, "path_id: %d",
 				sensor_grp_config->stream_grp_cfg[index].stream_cfg[i].path_id);
@@ -541,6 +543,8 @@ static int cam_ife_mgr_update_vc_dt_sensor_stream_cfg(
 	case CAM_ISP_VIRTUAL_RDI3_PATH:
 	case CAM_ISP_VIRTUAL_RDI4_PATH:
 	case CAM_ISP_VIRTUAL_RDI5_PATH:
+	case CAM_ISP_VIRTUAL_RDI6_PATH:
+	case CAM_ISP_VIRTUAL_RDI7_PATH:
 		for (j = 0; j < CAM_ISP_VC_DT_CFG; j++) {
 			if ((!grp_cfg->stream_cfg[stream_idx].rdi_vc[j]) &&
 				(!grp_cfg->stream_cfg[stream_idx].rdi_dt[j])) {
@@ -1066,6 +1070,24 @@ static int cam_ife_hw_mgr_update_res_virtual_mapping_table(
 		case CAM_IFE_PIX_PATH_RES_RDI_5:
 			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_5;
 			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_6:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_6;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_7:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_7;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_8:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_8;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_9:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_9;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_10:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_10;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_11:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_11;
+			break;
 		default:
 			CAM_ERR(CAM_ISP, "invalid resource type :%d",
 				hw_mgr_res->res_id);
@@ -1210,10 +1232,7 @@ static int cam_ife_hw_mgr_link_csid_rdi_resources(
 		list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_tmp,
 			&g_ife_sns_grp_cfg.grp_cfg[index]->res_ife_csid_list,
 			list) {
-			if (((hw_mgr_res->hw_res[0]->res_id >=
-				CAM_IFE_PIX_PATH_RES_RDI_0) &&
-				(hw_mgr_res->hw_res[0]->res_id <=
-				CAM_IFE_PIX_PATH_RES_RDI_5)) &&
+			if (cam_ife_hw_mgr_is_csid_rdi_path(hw_mgr_res->hw_res[0]->res_id) &&
 				(!hw_mgr_res->hw_res[0]->linked)) {
 				for (j = 0; j < in_port->num_valid_vc_dt; j++) {
 					if ((in_port->vc[j] == hw_mgr_res->vc) &&
@@ -1359,6 +1378,8 @@ int cam_convert_res_id_to_hw_path(int res_id, int csid_res_id)
 			return CAM_ISP_PXL1_PATH;
 		else if (csid_res_id == CAM_IFE_PIX_PATH_RES_IPP_2)
 			return CAM_ISP_PXL2_PATH;
+		else if (csid_res_id == CAM_IFE_PIX_PATH_RES_IPP_3)
+			return CAM_ISP_PXL3_PATH;
 		else
 			return CAM_ISP_PXL_PATH;
 	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI0) {
@@ -1373,6 +1394,18 @@ int cam_convert_res_id_to_hw_path(int res_id, int csid_res_id)
 		return CAM_ISP_RDI4_PATH;
 	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI5) {
 		return CAM_ISP_RDI5_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI6) {
+		return CAM_ISP_RDI6_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI7) {
+		return CAM_ISP_RDI7_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI8) {
+		return CAM_ISP_RDI8_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI9) {
+		return CAM_ISP_RDI9_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI10) {
+		return CAM_ISP_RDI10_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI11) {
+		return CAM_ISP_RDI11_PATH;
 	}
 
 	return 0;
@@ -1454,6 +1487,24 @@ static int cam_ife_hw_mgr_link_ife_src_resources(
 			break;
 		case CAM_IFE_PIX_PATH_RES_RDI_5:
 			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI5;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_6:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI6;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_7:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI7;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_8:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI8;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_9:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI9;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_10:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI10;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_11:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI11;
 			break;
 		default:
 			CAM_ERR(CAM_ISP, "Wrong IFE CSID Path Resource ID : %d",
@@ -1592,6 +1643,24 @@ static int cam_ife_hw_mgr_link_res_ife_out_rdi(
 		break;
 	case CAM_ISP_HW_VFE_IN_RDI5:
 		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_5;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI6:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_6;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI7:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_7;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI8:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_8;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI9:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_9;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI10:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_10;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI11:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_11;
 		break;
 	default:
 		CAM_ERR(CAM_ISP, "invalid resource type");
@@ -1808,6 +1877,12 @@ static int cam_ife_hw_mgr_link_ife_out_resources(
 		case CAM_ISP_HW_VFE_IN_RDI3:
 		case CAM_ISP_HW_VFE_IN_RDI4:
 		case CAM_ISP_HW_VFE_IN_RDI5:
+		case CAM_ISP_HW_VFE_IN_RDI6:
+		case CAM_ISP_HW_VFE_IN_RDI7:
+		case CAM_ISP_HW_VFE_IN_RDI8:
+		case CAM_ISP_HW_VFE_IN_RDI9:
+		case CAM_ISP_HW_VFE_IN_RDI10:
+		case CAM_ISP_HW_VFE_IN_RDI11:
 			rc = cam_ife_hw_mgr_link_res_ife_out_rdi(ife_ctx,
 				ife_src_res, in_port, index);
 			break;
@@ -2946,6 +3021,12 @@ int cam_ife_mgr_enable_irq(
 		case CAM_ISP_IFE_OUT_RES_RDI_3:
 		case CAM_ISP_IFE_OUT_RES_RDI_4:
 		case CAM_ISP_IFE_OUT_RES_RDI_5:
+		case CAM_ISP_IFE_OUT_RES_RDI_6:
+		case CAM_ISP_IFE_OUT_RES_RDI_7:
+		case CAM_ISP_IFE_OUT_RES_RDI_8:
+		case CAM_ISP_IFE_OUT_RES_RDI_9:
+		case CAM_ISP_IFE_OUT_RES_RDI_10:
+		case CAM_ISP_IFE_OUT_RES_RDI_11:
 			if (!res_rdi_context_set && cam_isp_is_ctx_primary_rdi(ife_ctx)) {
 				hw_mgr_res->hw_res[0]->is_rdi_primary_res =
 					cam_isp_is_ctx_primary_rdi(ife_ctx);
