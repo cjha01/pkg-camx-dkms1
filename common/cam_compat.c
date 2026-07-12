@@ -639,11 +639,20 @@ int cam_compat_util_get_irq(struct cam_hw_soc_info *soc_info)
 int cam_compat_util_get_irq(struct cam_hw_soc_info *soc_info)
 {
 	int rc = 0;
+	int i;
 
-	soc_info->irq_num[0] = platform_get_irq(soc_info->pdev, 0);
-	if (soc_info->irq_num[0] < 0) {
-		rc = soc_info->irq_num[0];
-		return rc;
+	if (soc_info->irq_count > CAM_SOC_MAX_IRQ_LINES_PER_DEV) {
+		CAM_ERR(CAM_UTIL, "irq_count %d exceeds max %d",
+			soc_info->irq_count, CAM_SOC_MAX_IRQ_LINES_PER_DEV);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < soc_info->irq_count; i++) {
+		soc_info->irq_num[i] = platform_get_irq(soc_info->pdev, i);
+		if (soc_info->irq_num[i] < 0) {
+			rc = soc_info->irq_num[i];
+			return rc;
+		}
 	}
 
 	return rc;
