@@ -20,6 +20,18 @@ struct cam_icp_fw_candidate {
 };
 
 /**
+ * struct cam_icp_fw_cache
+ * @fw:     Cached firmware blob; valid once @loaded is true. Kept alive for
+ *          the driver lifetime to avoid repeated filesystem reads on re-boot.
+ * @loaded: Set to true after the first successful firmware request; subsequent
+ *          boots skip the disk lookup and reuse @fw directly.
+ */
+struct cam_icp_fw_cache {
+	const struct firmware *fw;
+	bool loaded;
+};
+
+/**
  * cam_icp_get_fw_candidates() - Build unique ICP firmware lookup list
  * @fw_name: Firmware name/path from DT (may include basename or full path)
  * @suffix: Extension to append when @fw_name has no firmware extension
@@ -48,4 +60,3 @@ int cam_icp_request_fw_from_candidates(struct device *dev,
 	const struct firmware **fw);
 
 #endif /* _CAM_ICP_UTIL_H_ */
-

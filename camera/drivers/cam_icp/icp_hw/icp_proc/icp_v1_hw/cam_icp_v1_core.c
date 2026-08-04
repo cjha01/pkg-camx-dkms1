@@ -70,28 +70,35 @@ static int32_t cam_icp_v1_download_fw(void *device_priv)
 
 	rc = of_property_read_string(pdev->dev.of_node, "fw_name", &firmware_name);
 
-	num_candidates = cam_icp_get_fw_candidates(firmware_name,
-		".elf", candidates, ARRAY_SIZE(candidates));
-	if (num_candidates < 0) {
-		CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
-				num_candidates);
-		return num_candidates;
+	if (!core_info->fw_cache.loaded) {
+		num_candidates = cam_icp_get_fw_candidates(firmware_name,
+			".elf", candidates, ARRAY_SIZE(candidates));
+		if (num_candidates < 0) {
+			CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
+					num_candidates);
+			return num_candidates;
+		}
+
+		rc = cam_icp_request_fw_from_candidates(&pdev->dev,
+			candidates, num_candidates, &core_info->fw_cache.fw);
+		if (rc < 0) {
+			CAM_ERR(CAM_ICP, "Failed to locate firmware");
+			return rc;
+		}
+
+		CAM_INFO(CAM_ICP, "[%s] Loaded ELF firmware from disk", soc_info->dev_name);
+	} else {
+		CAM_INFO(CAM_ICP, "[%s] Reusing cached ELF firmware, skipping disk read",
+			soc_info->dev_name);
 	}
 
-	rc = cam_icp_request_fw_from_candidates(&pdev->dev,
-		candidates, num_candidates, &core_info->fw_elf);
-	if (rc < 0) {
-		CAM_ERR(CAM_ICP, "Failed to locate firmware");
-		return rc;
-	}
-
-	if (!core_info->fw_elf) {
+	if (!core_info->fw_cache.fw) {
 		CAM_ERR(CAM_ICP, "Invalid elf size");
 		rc = -EINVAL;
 		goto fw_download_failed;
 	}
 
-	fw_start = core_info->fw_elf->data;
+	fw_start = core_info->fw_cache.fw->data;
 	rc = cam_icp_validate_fw(fw_start, EM_ARM);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "fw elf validation failed");
@@ -117,8 +124,13 @@ static int32_t cam_icp_v1_download_fw(void *device_priv)
 		goto fw_download_failed;
 	}
 
+	core_info->fw_cache.loaded = true;
+
 fw_download_failed:
-	release_firmware(core_info->fw_elf);
+	if (rc && core_info->fw_cache.fw && !core_info->fw_cache.loaded) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+	}
 	return rc;
 }
 

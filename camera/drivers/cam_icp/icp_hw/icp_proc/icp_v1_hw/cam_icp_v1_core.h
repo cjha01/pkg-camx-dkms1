@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef CAM_ICP_V1_CORE_H
@@ -14,6 +14,7 @@
 
 #include "cam_icp_hw_intf.h"
 #include "hfi_intf.h"
+#include "cam_icp_util.h"
 
 #define ICP_V1_QGIC_BASE            0
 #define ICP_V1_BASE                 1
@@ -28,23 +29,16 @@
 #define ELF_GUARD_PAGE              (2 * 1024 * 1024)
 
 /**
- * struct cam_icp_v1_device_hw_info
- * @icp_v1_hw_info: ICP_V1 hardware info
- * @fw_elf: start address of fw start with elf header
- * @fw: start address of fw blob
+ * struct cam_icp_v1_device_core_info
  * @fw_buf: smmu alloc/mapped fw buffer
  * @fw_buf_len: fw buffer length
- * @query_cap: ICP_V1 query info from firmware
- * @icp_v1_acquire: Acquire information of ICP_V1
  * @irq_cb: IRQ callback
  * @cpas_handle: CPAS handle for ICP_V1
  * @hfi_handle: hfi handle for ICP V1
- * @hw_version: hw version of icp v1 processor
  * @cpas_start: state variable for cpas
+ * @fw_cache: cached fw blob; reused across multiple icp subdev open call
  */
 struct cam_icp_v1_device_core_info {
-	const struct firmware *fw_elf;
-	void *fw;
 	uint32_t fw_buf;
 	uintptr_t fw_kva_addr;
 	uint64_t fw_buf_len;
@@ -52,6 +46,7 @@ struct cam_icp_v1_device_core_info {
 	uint32_t cpas_handle;
 	int32_t hfi_handle;
 	bool cpas_start;
+	struct cam_icp_fw_cache fw_cache;
 };
 
 int cam_icp_v1_init_hw(void *device_priv,

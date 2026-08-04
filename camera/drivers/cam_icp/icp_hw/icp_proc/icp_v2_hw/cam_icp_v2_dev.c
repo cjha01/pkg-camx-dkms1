@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
 #include <linux/of_device.h>
+#include <linux/firmware.h>
 
 #include "camera_main.h"
 #include "cam_debug_util.h"
@@ -206,6 +207,7 @@ static void cam_icp_v2_component_unbind(struct device *dev,
 	struct platform_device *pdev = to_platform_device(dev);
 	struct cam_hw_intf *icp_v2_intf = NULL;
 	struct cam_hw_info *icp_v2_info = NULL;
+	struct cam_icp_v2_core_info *core_info = NULL;
 
 	icp_v2_intf = platform_get_drvdata(pdev);
 
@@ -215,12 +217,19 @@ static void cam_icp_v2_component_unbind(struct device *dev,
 	}
 
 	icp_v2_info = icp_v2_intf->hw_priv;
+	core_info = (struct cam_icp_v2_core_info *)icp_v2_info->core_info;
 
 	cam_icp_v2_cpas_unregister(icp_v2_intf);
 	cam_icp_soc_resources_deinit(&icp_v2_info->soc_info);
 	cam_icp_v2_soc_info_deinit(&icp_v2_info->soc_info);
 
 	max_icp_v2_hw_idx = -1;
+
+	if (core_info->fw_cache.loaded && core_info->fw_cache.fw) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+		core_info->fw_cache.loaded = false;
+	}
 
 	kfree(icp_v2_info->core_info);
 	kfree(icp_v2_info);
