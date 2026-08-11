@@ -981,6 +981,10 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		 */
 		s_ctrl->is_probe_succeed = 1;
 		s_ctrl->sensor_state = CAM_SENSOR_INIT;
+		if (cam_sensor_add_device(s_ctrl) < 0) {
+			CAM_DBG(CAM_SENSOR, "Failed to create sysfs entry for Slot=%d",
+					s_ctrl->soc_info.index);
+		}
 	}
 		break;
 	case CAM_ACQUIRE_DEV: {
@@ -1403,6 +1407,11 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 		return -EINVAL;
 	}
 
+	if (cam_sensor_pwr_ref_get(s_ctrl) > 1) {
+		CAM_ERR(CAM_SENSOR, "Sensor already powered up: refcount %d", s_ctrl->pwr_ref_cnt);
+		return 0;
+	}
+
 	soc_info = &s_ctrl->soc_info;
 
 	if (s_ctrl->bob_pwm_switch) {
@@ -1418,7 +1427,7 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 	rc = cam_sensor_core_power_up(power_info, soc_info);
 	if (rc < 0) {
 		CAM_ERR(CAM_SENSOR, "power up the core is failed:%d", rc);
-		return rc;
+		goto cci_ref_put;
 	}
 
 	rc = camera_io_init(&(s_ctrl->io_master_info));
@@ -1428,9 +1437,13 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 	}
 
 	return rc;
+
 cci_failure:
 	if (cam_sensor_util_power_down(power_info, soc_info))
 		CAM_ERR(CAM_SENSOR, "power down failure");
+
+cci_ref_put:
+	cam_sensor_pwr_ref_put(s_ctrl);
 
 	return rc;
 
@@ -1454,6 +1467,18 @@ int cam_sensor_power_down(struct cam_sensor_ctrl_t *s_ctrl)
 		CAM_ERR(CAM_SENSOR, "failed: power_info %pK", power_info);
 		return -EINVAL;
 	}
+
+	if (!cam_sensor_pwr_ref_read(s_ctrl)) {
+		CAM_ERR(CAM_SENSOR, "Sensor stop not expected: refcount %d", s_ctrl->pwr_ref_cnt);
+		return -EINVAL;
+	}
+
+	if (cam_sensor_pwr_ref_read(s_ctrl) > 1) {
+		CAM_ERR(CAM_SENSOR, "Sensor skip stop: refcount %d", s_ctrl->pwr_ref_cnt);
+		cam_sensor_pwr_ref_put(s_ctrl);
+		return 0;
+	}
+
 	rc = cam_sensor_util_power_down(power_info, soc_info);
 	if (rc < 0) {
 		CAM_ERR(CAM_SENSOR, "power down the core is failed:%d", rc);
@@ -1471,6 +1496,8 @@ int cam_sensor_power_down(struct cam_sensor_ctrl_t *s_ctrl)
 	}
 
 	camera_io_release(&(s_ctrl->io_master_info));
+
+	cam_sensor_pwr_ref_put(s_ctrl);
 
 	return rc;
 }
