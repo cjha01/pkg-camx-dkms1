@@ -271,7 +271,6 @@ struct i2c_rdwr_header {
  *
  * @ reg_addr        :   Register address
  * @ reg_data        :   Register data
- *
  */
 struct i2c_random_wr_payload {
 	__u32     reg_addr;
@@ -288,6 +287,32 @@ struct cam_cmd_i2c_random_wr {
 	union {
 		struct i2c_random_wr_payload random_wr_payload[1];
 		__DECLARE_FLEX_ARRAY(struct i2c_random_wr_payload, random_wr_payload_flex);
+	};
+} __attribute__((packed));
+
+/**
+ * struct i2c_rd_ap_wr_payload - payload for I2C read append write
+ *
+ * @ reg_addr        :   Register address
+ * @ reg_data        :   Register data
+ * @ mask            :   Mask value
+ */
+struct i2c_rd_ap_wr_payload {
+	__u32     reg_addr;
+	__u32     reg_data;
+	__u32     mask;
+} __attribute__((packed));
+
+/**
+ * struct cam_cmd_i2c_random_wr - I2C random write command
+ * @ header            :   header of READ/WRITE I2C command
+ * @ random_wr_payload :   payload for I2C random write
+ */
+struct cam_cmd_i2c_rd_ap_wr {
+	struct i2c_rdwr_header       header;
+	union {
+		struct i2c_rd_ap_wr_payload rd_ap_wr_payload[1];
+		__DECLARE_FLEX_ARRAY(struct i2c_rd_ap_wr_payload, rd_ap_wr_payload_flex);
 	};
 } __attribute__((packed));
 
@@ -357,6 +382,23 @@ struct cam_cmd_i2c_continuous_rd_v2 {
 	__u32                  reg_addr;
 	__u32                  num_bytes;
 	struct cam_cmd_read    data_read[1];
+} __attribute__((packed));
+
+/**
+ * struct cam_cmd_i2c_sequential_xfer - I2C sequential transfer lock/unlock command
+ * @ header          :   header of READ/WRITE I2C command
+ * @ reserved        :
+ * @ op_code         :   Opcode
+ * @ cmd_type        :   Explains type of command
+ * @ lock            :   lock or unlock
+ *
+ */
+struct cam_cmd_i2c_sequential_xfer {
+	struct i2c_rdwr_header header;
+	__u16    reserved;
+	__u8     op_code;
+	__u8     cmd_type;
+	__u32    lock;
 } __attribute__((packed));
 
 /**

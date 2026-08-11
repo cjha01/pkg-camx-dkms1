@@ -489,6 +489,24 @@ static int32_t cam_sensor_i2c_modes_util(
 		rc = cam_sensor_i2c_read_data(
 			&s_ctrl->i2c_data.read_settings,
 			&s_ctrl->io_master_info);
+	} else if (i2c_list->op_code == CAM_SENSOR_I2C_READ_APPEND_WRITE) {
+		CAM_DBG(CAM_SENSOR, "Captured READ_APPEND_WRITE OPCODE");
+		rc = camera_io_dev_read_append_write(io_master_info,
+			&(i2c_list->i2c_settings));
+		if (rc < 0) {
+			CAM_ERR(CAM_SENSOR,
+				"i2c Read_append_write settings Failed: %d", rc);
+			return rc;
+		}
+	} else if ((i2c_list->op_code == CAM_SENSOR_I2C_SEQUENTIAL_XFER_LOCK) ||
+			(i2c_list->op_code == CAM_SENSOR_I2C_SEQUENTIAL_XFER_UNLOCK)) {
+		rc = camera_io_dev_sequential_xfer(io_master_info,
+			&(i2c_list->seq_xfer));
+		if (rc < 0) {
+			CAM_ERR(CAM_SENSOR,
+					"i2c Sequential Xfer settings Failed: %d", rc);
+			return rc;
+		}
 	}
 
 	return rc;
