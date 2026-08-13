@@ -807,7 +807,8 @@ int cam_register_subdev(struct cam_subdev *csd)
 	int csd_name_len, rc;
 
 	if (!g_dev.state) {
-		CAM_DBG(CAM_CRM, "camera root device not ready yet");
+		CAM_ERR(CAM_CRM, "cam_register_subdev: state=false, returning EPROBE_DEFER for %s",
+			(csd && csd->name) ? csd->name : "NULL");
 		return -EPROBE_DEFER;
 	}
 

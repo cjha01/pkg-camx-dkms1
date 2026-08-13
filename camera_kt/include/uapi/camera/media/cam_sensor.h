@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __UAPI_CAM_SENSOR_H__
@@ -16,6 +16,33 @@
 #define MAX_OIS_NAME_SIZE 32
 #define CAM_CSIPHY_SECURE_MODE_ENABLED 1
 #define CAM_IR_LED_SUPPORTED
+#define MAX_LDM_FW_COUNT 3
+#define MAX_LDM_NAME_SIZE 32
+#define MAX_LDM_SUPPORTED 3
+
+/*
+ * Feature-presence macro for UMD: signals that this header defines the
+ * LDM UAPI (struct cam_sensor_query_cap_v2, CAM_QUERY_CAP_V2, and the
+ * cam-lensdriver subdev structs/opcodes below), so UMD can probe
+ * CAM_QUERY_CAP_V2 and fall back to CAM_QUERY_CAP against an older KMD.
+ */
+#define CAM_LDM_ENABLED
+
+/*
+ * LDM UAPI struct extension rules:
+ * - Never change the size or layout of a struct once it has shipped in a
+ *   released kernel.
+ * - To extend a fixed capability/info struct queried via an opcode (e.g.
+ *   CAM_QUERY_CAP), add a new opcode (..._V2) and a new struct (..._v2),
+ *   following cam_sensor_query_cap -> cam_sensor_query_cap_v2 and
+ *   CAM_QUERY_CAP -> CAM_QUERY_CAP_V2 / cam_cpas_query_cap_v2.
+ * - Likewise, to extend a command-buffer payload struct, add a new opcode
+ *   and a new struct (..._v2) rather than changing the size or layout of
+ *   the existing struct, following cam_cmd_i2c_continuous_rd ->
+ *   cam_cmd_i2c_continuous_rd_v2 and CAMERA_SENSOR_CMD_TYPE_I2C_CONT_RD ->
+ *   CAMERA_SENSOR_LDM_CMD_TYPE_I2C_CONT_RD_V2.
+ */
+
 /**
  * struct cam_sensor_query_cap - capabilities info for sensor
  *
@@ -44,6 +71,22 @@ struct  cam_sensor_query_cap {
 	__u32        flash_slot_id;
 	__u32        csiphy_slot_id;
 	__u32        ir_led_slot_id;
+} __attribute__((packed));
+
+/**
+ * struct cam_sensor_query_cap_v2 - extended capabilities info for sensor
+ *                                   (queried via CAM_QUERY_CAP_V2)
+ *
+ * @query_cap_v1     :  Base capability info, identical to
+ *                      struct cam_sensor_query_cap
+ * @ldm_slot_id      :  Lens driver slot id which connected to sensor
+ * @reserved         :  Reserved field for 64-bit alignment
+ *
+ */
+struct cam_sensor_query_cap_v2 {
+	struct cam_sensor_query_cap query_cap_v1;
+	__u32                       ldm_slot_id[MAX_LDM_SUPPORTED];
+	__u32                       reserved;
 } __attribute__((packed));
 
 /**
@@ -214,7 +257,6 @@ struct cam_cmd_power {
  * @ cmd_type        :   Command buffer type
  * @ data_type       :   I2C data type
  * @ addr_type       :   I2C address type
- * @ reserved
  */
 struct i2c_rdwr_header {
 	__u32    count;
@@ -291,11 +333,30 @@ struct cam_cmd_i2c_random_rd {
  * struct cam_cmd_i2c_continuous_rd - I2C continuous continuous read command
  * @ header          :   header of READ/WRITE I2C command
  * @ reg_addr        :   Register address
- *
  */
 struct cam_cmd_i2c_continuous_rd {
 	struct i2c_rdwr_header header;
 	__u32                  reg_addr;
+} __attribute__((packed));
+
+/**
+ * struct cam_cmd_i2c_continuous_rd_v2 - I2C continuous read command with an
+ *                                        explicit read length, used by the
+ *                                        lens driver module. Queried via
+ *                                        CAMERA_SENSOR_LDM_CMD_TYPE_I2C_CONT_RD_V2
+ *                                        instead of extending
+ *                                        struct cam_cmd_i2c_continuous_rd in
+ *                                        place.
+ * @ header          :   header of READ/WRITE I2C command
+ * @ reg_addr        :   Register address
+ * @ num_bytes       :   Number of read bytes
+ * @ data_read       :   I2C read command
+ */
+struct cam_cmd_i2c_continuous_rd_v2 {
+	struct i2c_rdwr_header header;
+	__u32                  reg_addr;
+	__u32                  num_bytes;
+	struct cam_cmd_read    data_read[1];
 } __attribute__((packed));
 
 /**
@@ -534,6 +595,100 @@ struct cam_ir_led_query_cap_info {
 	 __u8     brightness;
 } __attribute__((packed));
 
+
+/**
+ * struct cam_ldm_query_cap  :  capabilities info for lens driver
+ *
+ * @slot_info           :  Indicates about the slotId or cell Index
+ * @reserved            :  Reserved field for 64-bit alignment
+ *
+ */
+struct cam_ldm_query_cap {
+	__u32    slot_info;
+	__u32    reserved;
+} __attribute__ ((packed));
+
+/**
+ * struct cam_cmd_lens_driver_info - Contains lens driver slave info
+ *
+ * @slave_addr              :    Lens driver i2c slave address
+ * @i2c_freq_mode           :    i2c frequency mode
+ * @cmd_type                :    Explains type of command
+ * @ldm_fw_flag             :    indicates if fw is present or not
+ * @is_ldm_calib            :    indicates the calibration data is available
+ * @spi_mode                :    SPI mode of communication
+ * @is_always_power_on      :    opcode\
+ * @is_single_byte_txfr     : True if single byte transcation required for SPI
+ * @spi_freq                :    SPI frequency
+ */
+struct cam_cmd_lens_driver_info {
+	__u32                 slave_addr;
+	__u8                  i2c_freq_mode;
+	__u8                  cmd_type;
+	__u8                  ldm_fw_flag;
+	__u8                  is_ldm_calib;
+	__u8                  spi_mode;
+	__u8                  is_always_power_on;
+	__u8                  is_single_byte_txfr;
+	__u8                  reserved;
+	__u32                 spi_freq;
+} __attribute__((packed));
+
+/**
+ * struct cam_cmd_ldm_fw_param - Contains LDM firmware param
+ *
+ * @fw_name           :       firmware file name
+ * @fw_start_pos      :       data start position in file
+ * @fw_size           :       firmware size
+ * @fw_len_per_write  :       data length per write in bytes
+ * @fw_addr_type      :       addr type
+ * @fw_data_type      :       data type
+ * @fw_operation      :       type of operation
+ * @isOnlyWritefwData :       Only write data during fw write command
+ * @fw_delayUs        :       delay in cci write
+ * @fw_reg_addr       :       start register addr to write
+ * @fw_init_size      :       size of fw download init settings
+ * @fw_finalize_size  :       size of fw download finalize settings
+ */
+struct cam_cmd_ldm_fw_param {
+	char        fw_name[MAX_LDM_NAME_SIZE];
+	__u32       fw_start_pos;
+	__u32       fw_size;
+	__u32       fw_len_per_write;
+	__u8        fw_addr_type;
+	__u8        fw_data_type;
+	__u8        fw_operation;
+	__u8        isOnlyWritefwData;
+	__u32       fw_delayUs;
+	__u32       fw_reg_addr;
+	__u32       fw_init_size;
+	__u32       fw_finalize_size;
+} __attribute__((packed));
+
+/**
+ * struct cam_cmd_ldm_fw_info - Contains LDM firmware info
+ *
+ * The header (fw_count/reserved/cmd_type) mirrors struct common_header's
+ * layout (first_word, fifth_byte, cmd_type, reserved) so that generic
+ * dispatch code which peeks at a command buffer's header via struct
+ * common_header before knowing the buffer's real type reads cmd_type
+ * from the correct byte offset (5).
+ *
+ * @fw_count              : firmware count
+ * @reserved              : reserved, keeps cmd_type at byte offset 5
+ * @cmd_type              : Explains type of command
+ * @fw_sys_clock_spi_freq : SPI frequency for fwSysClockSettings update
+ * @fw_sys_clock_size     : size of FW boot sys clock setting
+ * @fw_param              : includes firmware parameters
+ */
+struct cam_cmd_ldm_fw_info {
+	__u8                            fw_count;
+	__u32                           reserved;
+	__u8                            cmd_type;
+	__u32                           fw_sys_clock_spi_freq;
+	__u32                           fw_sys_clock_size;
+	struct cam_cmd_ldm_fw_param     fw_param[MAX_LDM_FW_COUNT];
+} __attribute__((packed));
 #define VIDIOC_MSM_CCI_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct cam_cci_ctrl)
 

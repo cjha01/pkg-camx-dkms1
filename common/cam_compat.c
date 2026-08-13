@@ -317,6 +317,11 @@ static inline int camera_component_compare_dev(struct device *dev, void *data)
 
 #ifdef CONFIG_SPECTRA_KT
 
+static int camera_spi_compare_dev(struct device *dev, const void *data)
+{
+	return spi_bus_type.match(dev, (struct device_driver *) data);
+}
+
 /* Add component matches to list for master of aggregate driver */
 int camera_component_match_add_drivers(struct device *master_dev,
 	struct component_match **match_list)
@@ -338,6 +343,23 @@ int camera_component_match_add_drivers(struct device *master_dev,
 		start_dev = NULL;
 		while ((match_dev = bus_find_device(&platform_bus_type,
 			start_dev, drv_ptr, &camera_platform_compare_dev))) {
+			put_device(start_dev);
+			pdev = to_platform_device(match_dev);
+			CAM_DBG(CAM_UTIL, "Adding matched component:%s", pdev->name);
+			component_match_add(master_dev, match_list,
+				camera_component_compare_dev, match_dev);
+			start_dev = match_dev;
+		}
+		put_device(start_dev);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(cam_component_spi_drivers); i++) {
+		struct device_driver const *drv =
+			&cam_component_spi_drivers[i]->driver;
+		const void *drv_ptr = (const void *)drv;
+		start_dev = NULL;
+		while ((match_dev = bus_find_device(&spi_bus_type,
+			start_dev, drv_ptr, &camera_spi_compare_dev))) {
 			put_device(start_dev);
 			pdev = to_platform_device(match_dev);
 			CAM_DBG(CAM_UTIL, "Adding matched component:%s", pdev->name);
@@ -402,7 +424,6 @@ int camera_component_match_add_drivers(struct device *master_dev,
 		}
 		put_device(start_dev);
 	}
-
 end:
 	return rc;
 }
