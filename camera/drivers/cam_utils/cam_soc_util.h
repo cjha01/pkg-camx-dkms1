@@ -87,6 +87,7 @@ typedef struct {
  * @CAM_NOMINAL_VOTE   : Nominal vote
  * @CAM_NOMINALL1_VOTE : Nominal plus vote
  * @CAM_TURBO_VOTE     : Turbo vote
+ * @CAM_TURBOL1_VOTE   : Turbo plus vote
  * @CAM_MAX_VOTE       : Max voting level, This is invalid level.
  */
 enum cam_vote_level {
@@ -99,6 +100,7 @@ enum cam_vote_level {
 	CAM_NOMINAL_VOTE,
 	CAM_NOMINALL1_VOTE,
 	CAM_TURBO_VOTE,
+	CAM_TURBOL1_VOTE,
 	CAM_MAX_VOTE,
 };
 
