@@ -17,9 +17,9 @@
 #include "cam_icp_soc_common.h"
 #include "cam_icp_v2_dev.h"
 #include "cam_icp_proc.h"
+#include "cam_icp_subdev.h"
 
 static int max_icp_v2_hw_idx = -1;
-extern struct camera_firmware cam_fw;
 
 struct cam_icp_v2_hw_info cam_icp_v2_hw_info[] = {
 	{
@@ -172,11 +172,20 @@ static int cam_icp_v2_component_bind(struct device *dev,
 	if ((int)(icp_v2_intf->hw_idx) > max_icp_v2_hw_idx)
 		max_icp_v2_hw_idx = icp_v2_intf->hw_idx;
 
+	core_info->fw = cam_icp_subdev_get_fw(icp_v2_intf->hw_idx);
+	if (!core_info->fw) {
+		CAM_ERR(CAM_ICP, "Invalid hw_idx: %u for FW instance lookup",
+			icp_v2_intf->hw_idx);
+		rc = -EINVAL;
+		goto cpas_unregister;
+	}
+
 	platform_set_drvdata(pdev, icp_v2_intf);
 
-	core_info->fw = &cam_fw;
 	return 0;
 
+cpas_unregister:
+	cam_icp_v2_cpas_unregister(icp_v2_intf);
 res_deinit:
 	cam_icp_soc_resources_deinit(&icp_v2_info->soc_info);
 free_soc_info:
