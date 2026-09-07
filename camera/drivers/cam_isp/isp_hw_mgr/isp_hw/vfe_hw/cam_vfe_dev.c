@@ -120,14 +120,19 @@ static int cam_vfe_component_bind(struct device *dev,
 	spin_lock_init(&vfe_hw->hw_lock);
 	init_completion(&vfe_hw->hw_complete);
 
-	if (vfe_hw_intf->hw_idx < CAM_VFE_HW_NUM_MAX)
-		cam_vfe_hw_list[vfe_hw_intf->hw_idx].hw_intf = vfe_hw_intf;
-
 	vfe_soc_priv = vfe_hw->soc_info.soc_private;
-	cam_vfe_hw_list[vfe_hw_intf->hw_idx].num_hw_pid = vfe_soc_priv->num_pid;
-	for (i = 0; i < vfe_soc_priv->num_pid; i++)
-		cam_vfe_hw_list[vfe_hw_intf->hw_idx].hw_pid[i] =
-			vfe_soc_priv->pid[i];
+	/* Guard pid table writes against out-of-bounds hw_idx */
+	if (vfe_hw_intf->hw_idx < CAM_VFE_HW_NUM_MAX) {
+		cam_vfe_hw_list[vfe_hw_intf->hw_idx].hw_intf = vfe_hw_intf;
+		cam_vfe_hw_list[vfe_hw_intf->hw_idx].num_hw_pid = vfe_soc_priv->num_pid;
+		for (i = 0; i < vfe_soc_priv->num_pid; i++)
+			cam_vfe_hw_list[vfe_hw_intf->hw_idx].hw_pid[i] =
+				vfe_soc_priv->pid[i];
+	} else {
+		CAM_ERR(CAM_ISP,
+			"VFE hw_idx %d exceeds CAM_VFE_HW_NUM_MAX %d, skipping registration",
+			vfe_hw_intf->hw_idx, CAM_VFE_HW_NUM_MAX);
+	}
 
 	CAM_DBG(CAM_ISP, "VFE:%d component bound successfully",
 		vfe_hw_intf->hw_idx);
@@ -238,6 +243,8 @@ int cam_vfe_probe(struct platform_device *pdev)
 	if (strnstr(compatible_name, "lite", strlen(compatible_name)) != NULL)
 		g_num_ife_lite_hws++;
 	else if (strnstr(compatible_name, "vfe", strlen(compatible_name)) != NULL)
+		g_num_ife_hws++;
+	else if (strnstr(compatible_name, "mc_tfe", strlen(compatible_name)) != NULL)
 		g_num_ife_hws++;
 	else
 		CAM_ERR(CAM_ISP, "Failed to increment number of IFEs/IFE-LITEs");
