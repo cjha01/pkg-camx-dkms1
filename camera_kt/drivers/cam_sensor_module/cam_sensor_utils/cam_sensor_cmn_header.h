@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
@@ -31,6 +30,7 @@
 #define CAM_FLASH_NAME     "cam-flash"
 #define CAM_EEPROM_NAME    "cam-eeprom"
 #define CAM_OIS_NAME       "cam-ois"
+#define CAM_LENS_DRIVER_NAME "cam-lensdriver"
 
 #define MAX_SYSTEM_PIPELINE_DELAY 2
 
@@ -54,6 +54,8 @@ enum camera_sensor_cmd_type {
 	CAMERA_SENSOR_FLASH_CMD_TYPE_WIDGET,
 	CAMERA_SENSOR_CMD_TYPE_RD_DATA,
 	CAMERA_SENSOR_FLASH_CMD_TYPE_INIT_FIRE,
+	CAMERA_SENSOR_LDM_CMD_TYPE_FW_INFO,
+	CAMERA_SENSOR_LDM_CMD_TYPE_I2C_CONT_RD_V2,
 	CAMERA_SENSOR_CMD_TYPE_MAX,
 };
 
@@ -131,6 +133,9 @@ enum sensor_sub_module {
 	SUB_MODULE_OIS,
 	SUB_MODULE_IR_LED,
 	SUB_MODULE_EXT,
+	SUB_MODULE_LENS_DRIVER0,
+	SUB_MODULE_LENS_DRIVER1,
+	SUB_MODULE_LENS_DRIVER2,
 	SUB_MODULE_MAX,
 };
 
@@ -182,6 +187,14 @@ enum cam_ois_packet_opcodes {
 	CAM_OIS_PACKET_OPCODE_OIS_CONTROL,
 	CAM_OIS_PACKET_OPCODE_READ,
 	CAM_OIS_PACKET_OPCODE_WRITE_TIME
+};
+
+enum cam_lens_driver_packet_opcodes {
+	CAM_LENS_DRIVER_PACKET_OPCODE_INIT,
+	CAM_LENS_DRIVER_PACKET_OPCODE_MOTOR_OPERATION,
+	CAM_LENS_DRIVER_PACKET_OPCODE_READ,
+	CAM_LENS_DRIVER_PACKET_OPCODE_STREAMON,
+	CAM_LENS_DRIVER_PACKET_OPCODE_STREAMOFF
 };
 
 enum msm_bus_perf_setting {
@@ -287,6 +300,8 @@ struct cam_sensor_i2c_reg_setting {
 	unsigned short delay;
 	uint8_t *read_buff;
 	uint32_t read_buff_len;
+	uint32_t read_bytes;
+	uint8_t write_only_data;
 };
 
 struct cam_sensor_i2c_seq_reg {

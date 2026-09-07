@@ -34,6 +34,7 @@ ccflags-y += \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_csiphy \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_csiphy/include \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_ir_led \
+	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_lens_driver \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_flash \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_cci \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_cci/include \
@@ -362,7 +363,10 @@ camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_SENSOR) += \
 	camera_kt/drivers/cam_sensor_module/cam_hdmi_bdg/cam_hdmi_bdg_core.o \
 	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_dev.o \
 	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_core.o \
-	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_soc.o
+	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_soc.o \
+	camera_kt/drivers/cam_sensor_module/cam_lens_driver/cam_lens_driver_dev.o \
+	camera_kt/drivers/cam_sensor_module/cam_lens_driver/cam_lens_driver_core.o \
+	camera_kt/drivers/cam_sensor_module/cam_lens_driver/cam_lens_driver_soc.o
 
 camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_CUSTOM) += \
 	camera_kt/drivers/cam_cust/cam_custom_hw_mgr/cam_custom_hw1/cam_custom_sub_mod_soc.o \

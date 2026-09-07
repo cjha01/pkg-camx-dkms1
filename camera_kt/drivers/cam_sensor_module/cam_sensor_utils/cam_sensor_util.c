@@ -112,7 +112,7 @@ int32_t delete_request(struct i2c_settings_array *i2c_array)
 	return rc;
 }
 
-static int32_t cam_sensor_handle_delay(
+int32_t cam_sensor_handle_delay(
 	uint32_t **cmd_buf,
 	uint16_t generic_op_code,
 	struct i2c_settings_array *i2c_reg_settings,
@@ -152,7 +152,7 @@ static int32_t cam_sensor_handle_delay(
 	return rc;
 }
 
-static int32_t cam_sensor_handle_poll(
+int32_t cam_sensor_handle_poll(
 	uint32_t **cmd_buf,
 	struct i2c_settings_array *i2c_reg_settings,
 	uint32_t *byte_cnt, int32_t *offset,
@@ -192,7 +192,7 @@ static int32_t cam_sensor_handle_poll(
 	return rc;
 }
 
-static int32_t cam_sensor_handle_random_write(
+int32_t cam_sensor_handle_random_write(
 	struct cam_cmd_i2c_random_wr *cam_cmd_i2c_random_wr,
 	struct i2c_settings_array *i2c_reg_settings,
 	uint32_t *cmd_length_in_bytes, int32_t *offset,
@@ -231,7 +231,7 @@ static int32_t cam_sensor_handle_random_write(
 	return rc;
 }
 
-static int32_t cam_sensor_handle_continuous_write(
+int32_t cam_sensor_handle_continuous_write(
 	struct cam_cmd_i2c_continuous_wr *cam_cmd_i2c_continuous_wr,
 	struct i2c_settings_array *i2c_reg_settings,
 	uint32_t *cmd_length_in_bytes, int32_t *offset,
@@ -385,7 +385,7 @@ int32_t cam_sensor_util_write_qtimer_to_io_buffer(
 	return rc;
 }
 
-static int32_t cam_sensor_handle_random_read(
+int32_t cam_sensor_handle_random_read(
 	struct cam_cmd_i2c_random_rd *cmd_i2c_random_rd,
 	struct i2c_settings_array *i2c_reg_settings,
 	uint16_t *cmd_length_in_bytes,
@@ -395,6 +395,7 @@ static int32_t cam_sensor_handle_random_read(
 {
 	struct i2c_settings_list *i2c_list;
 	int32_t rc = 0, cnt = 0;
+
 	i2c_list = cam_sensor_get_i2c_ptr(i2c_reg_settings,
 		payload_count);
 	if ((i2c_list == NULL) ||
@@ -610,7 +611,8 @@ int cam_sensor_i2c_command_parser(
 				rc = cam_sensor_handle_random_write(
 					cam_cmd_i2c_random_wr,
 					i2c_reg_settings,
-					&cmd_length_in_bytes, &j, &list, payload_count);
+					&cmd_length_in_bytes, &j, &list,
+					payload_count);
 				if (rc < 0) {
 					CAM_ERR(CAM_SENSOR,
 					"Failed in random write %d", rc);
@@ -654,7 +656,8 @@ int cam_sensor_i2c_command_parser(
 				rc = cam_sensor_handle_continuous_write(
 					cam_cmd_i2c_continuous_wr,
 					i2c_reg_settings,
-					&cmd_length_in_bytes, &j, &list, payload_count);
+					&cmd_length_in_bytes, &j, &list,
+					payload_count);
 				if (rc < 0) {
 					CAM_ERR(CAM_SENSOR,
 					"Failed in continuous write %d", rc);
@@ -1008,7 +1011,7 @@ int32_t msm_camera_fill_vreg_params(
 
 	num_vreg = soc_info->num_rgltr;
 
-	if ((num_vreg <= 0) || (num_vreg > CAM_SOC_MAX_REGULATOR)) {
+	if ((num_vreg < 0) || (num_vreg > CAM_SOC_MAX_REGULATOR)) {
 		CAM_ERR(CAM_SENSOR, "failed: num_vreg %d", num_vreg);
 		return -EINVAL;
 	}
@@ -2081,7 +2084,7 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 	gpio_num_info = ctrl->gpio_num_info;
 	num_vreg = soc_info->num_rgltr;
 
-	if ((num_vreg <= 0) || (num_vreg > CAM_SOC_MAX_REGULATOR)) {
+	if ((num_vreg < 0) || (num_vreg > CAM_SOC_MAX_REGULATOR)) {
 		CAM_ERR(CAM_SENSOR, "failed: num_vreg %d", num_vreg);
 		return -EINVAL;
 	}
@@ -2435,7 +2438,7 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 	gpio_num_info = ctrl->gpio_num_info;
 	num_vreg = soc_info->num_rgltr;
 
-	if ((num_vreg <= 0) || (num_vreg > CAM_SOC_MAX_REGULATOR)) {
+	if ((num_vreg < 0) || (num_vreg > CAM_SOC_MAX_REGULATOR)) {
 		CAM_ERR(CAM_SENSOR, "failed: num_vreg %d", num_vreg);
 		return -EINVAL;
 	}

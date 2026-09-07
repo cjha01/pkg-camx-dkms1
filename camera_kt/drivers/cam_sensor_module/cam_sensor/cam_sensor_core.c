@@ -725,6 +725,19 @@ static void cam_sensor_query_cap(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->soc_info.index;
 }
 
+static void cam_sensor_query_cap_v2(struct cam_sensor_ctrl_t *s_ctrl,
+	struct cam_sensor_query_cap_v2 *query_cap)
+{
+	int32_t i = 0;
+
+	cam_sensor_query_cap(s_ctrl, &query_cap->query_cap_v1);
+	for (i = 0; i < MAX_LDM_SUPPORTED; i++) {
+		query_cap->ldm_slot_id[i] =
+			(s_ctrl->sensordata->subdev_id[SUB_MODULE_LENS_DRIVER0 + i] != -1) ?
+			s_ctrl->sensordata->subdev_id[SUB_MODULE_LENS_DRIVER0 + i] : 0xFFFFFFFF;
+	}
+}
+
 static uint16_t cam_sensor_id_by_mask(struct cam_sensor_ctrl_t *s_ctrl,
 	uint32_t chipid)
 {
@@ -1083,6 +1096,18 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		cam_sensor_query_cap(s_ctrl, &sensor_cap);
 		if (copy_to_user(u64_to_user_ptr(cmd->handle),
 			&sensor_cap, sizeof(struct  cam_sensor_query_cap))) {
+			CAM_ERR(CAM_SENSOR, "Failed Copy to User");
+			rc = -EFAULT;
+			goto release_mutex;
+		}
+		break;
+	}
+	case CAM_QUERY_CAP_V2: {
+		struct cam_sensor_query_cap_v2 sensor_cap_v2;
+
+		cam_sensor_query_cap_v2(s_ctrl, &sensor_cap_v2);
+		if (copy_to_user(u64_to_user_ptr(cmd->handle),
+			&sensor_cap_v2, sizeof(struct cam_sensor_query_cap_v2))) {
 			CAM_ERR(CAM_SENSOR, "Failed Copy to User");
 			rc = -EFAULT;
 			goto release_mutex;
