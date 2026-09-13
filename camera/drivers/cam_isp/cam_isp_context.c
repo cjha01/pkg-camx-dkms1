@@ -8185,6 +8185,7 @@ static int __cam_isp_ctx_acquire_hw_v2(struct cam_context *ctx,
 	ctx_isp->per_port_en = isp_hw_cmd_args.u.ctx_info.is_per_port_en;
 	ctx->ctxt_to_hw_map = param.ctxt_to_hw_map;
 	ctx->hw_mgr_ctx_id = param.hw_mgr_ctx_id;
+	ctx_isp->bubble_recover_dis = isp_hw_cmd_args.u.ctx_info.bubble_recover_dis;
 
 	snprintf(ctx->ctx_id_string, sizeof(ctx->ctx_id_string),
 		"%s_ctx[%d]_hwmgrctx[%d]_hwidx[0x%x]",

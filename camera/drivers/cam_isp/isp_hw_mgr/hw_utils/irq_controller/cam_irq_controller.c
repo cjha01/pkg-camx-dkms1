@@ -15,7 +15,7 @@
 #include "cam_common_util.h"
 
 #define CAM_IRQ_LINE_TEST_TIMEOUT_MS 1000
-#define CAM_IRQ_MAX_DEPENDENTS 9
+#define CAM_IRQ_MAX_DEPENDENTS 20
 #define CAM_IRQ_CTRL_NAME_LEN 16
 
 /**

@@ -732,7 +732,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe90x_bus_hw_info = {
 	.num_comp_grp    = 8,
 	.support_consumed_addr = true,
 	.comp_done_mask = {
-		BIT(0), BIT(1), BIT(2), BIT(3), BIT(4), BIT(5), BIT(6), BIT(7)
+		BIT(16), BIT(17), BIT(18), BIT(19), BIT(20), BIT(21), BIT(22), BIT(23)
 	},
 	.top_irq_shift   = 0,
 	.max_out_res = CAM_ISP_IFE_OUT_RES_BASE + 56,

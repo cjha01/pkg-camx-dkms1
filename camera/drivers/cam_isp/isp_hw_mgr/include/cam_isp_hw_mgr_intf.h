@@ -18,7 +18,7 @@
 /* MAX IFE instance */
 #define CAM_IFE_HW_NUM_MAX               16
 #define CAM_SFE_HW_NUM_MAX               3
-#define CAM_IFE_RDI_NUM_MAX              4
+#define CAM_IFE_RDI_NUM_MAX              12
 #define CAM_SFE_RDI_NUM_MAX              5
 #define CAM_SFE_FE_RDI_NUM_MAX           3
 #define CAM_ISP_BW_CONFIG_V1             1

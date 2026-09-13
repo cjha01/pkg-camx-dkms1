@@ -12447,9 +12447,13 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 
 		prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *)
 			prepare->priv;
-		clock_config_size = sizeof(struct cam_isp_clock_config) +
-			((clock_config->num_rdi - 1) *
-			sizeof(clock_config->rdi_hz));
+		if (clock_config->num_rdi == 0)
+			clock_config_size = sizeof(struct cam_isp_clock_config) -
+				sizeof(clock_config->rdi_hz);
+		else
+			clock_config_size = sizeof(struct cam_isp_clock_config) +
+				((clock_config->num_rdi - 1) *
+				sizeof(clock_config->rdi_hz));
 		memcpy(&prepare_hw_data->bw_clk_config.ife_clock_config, clock_config,
 			clock_config_size);
 		prepare_hw_data->bw_clk_config.ife_clock_config_valid = true;
@@ -19320,8 +19324,14 @@ static int cam_ife_mgr_check_fe(
 			is_offline,
 			bw_data);
 		break;
+	case 3:
+		CAM_DBG(CAM_ISP, "FE updates not applicable");
+		*is_offline = false;
+		*is_fe_enabled = false;
+		break;
 	default:
-		CAM_ERR(CAM_ISP, "Invalid ver of common info from user");
+		CAM_ERR(CAM_ISP, "Invalid ver of user common info:  minor %u major %u",
+			minor_ver, major_ver);
 		return -EINVAL;
 	}
 

@@ -1039,7 +1039,8 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			/* IMG comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP0 bits 3:0) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
 			.ubwc_regs                = &vfe900_ubwc_regs_client_0,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_BAYER_UBWC_TP10) |
+			.supported_formats        =  BIT_ULL(CAM_FORMAT_UBWC_NV12) |
+				BIT_ULL(CAM_FORMAT_BAYER_UBWC_TP10) |  BIT_ULL(CAM_FORMAT_UBWC_TP10) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_10) | BIT_ULL(CAM_FORMAT_MIPI_RAW_12) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_14) | BIT_ULL(CAM_FORMAT_PLAIN8) |
 				BIT_ULL(CAM_FORMAT_PLAIN16_8) | BIT_ULL(CAM_FORMAT_PLAIN16_10) |
@@ -1078,7 +1079,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			/* IMG comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP0 bits 3:0) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
 			.ubwc_regs                = &vfe900_ubwc_regs_client_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_BAYER_UBWC_TP10) |
+			.supported_formats        = BIT_ULL(CAM_FORMAT_UBWC_TP10) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_10) | BIT_ULL(CAM_FORMAT_MIPI_RAW_12) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_14) | BIT_ULL(CAM_FORMAT_PLAIN8) |
 				BIT_ULL(CAM_FORMAT_PLAIN16_8) | BIT_ULL(CAM_FORMAT_PLAIN16_10) |
@@ -1117,7 +1118,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			/* IMG comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP0 bits 3:0) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
 			.ubwc_regs                = &vfe900_ubwc_regs_client_2,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_BAYER_UBWC_TP10) |
+			.supported_formats        = BIT_ULL(CAM_FORMAT_UBWC_TP10) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_10) | BIT_ULL(CAM_FORMAT_MIPI_RAW_12) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_14) | BIT_ULL(CAM_FORMAT_PLAIN8) |
 				BIT_ULL(CAM_FORMAT_PLAIN16_8) | BIT_ULL(CAM_FORMAT_PLAIN16_10) |
@@ -1156,7 +1157,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			/* IMG comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP0 bits 3:0) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
 			.ubwc_regs                = &vfe900_ubwc_regs_client_3,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_BAYER_UBWC_TP10) |
+			.supported_formats        = BIT_ULL(CAM_FORMAT_UBWC_TP10) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_10) | BIT_ULL(CAM_FORMAT_MIPI_RAW_12) |
 				BIT_ULL(CAM_FORMAT_MIPI_RAW_14) | BIT_ULL(CAM_FORMAT_PLAIN8) |
 				BIT_ULL(CAM_FORMAT_PLAIN16_8) | BIT_ULL(CAM_FORMAT_PLAIN16_10) |
@@ -1580,7 +1581,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x00001D1C,
 			/* IMG comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP0 bits 3:0) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_TP10) |
+			.supported_formats        = BIT_ULL(CAM_FORMAT_TP10) | BIT_ULL(CAM_FORMAT_PD10) |
 				BIT_ULL(CAM_FORMAT_UBWC_TP10) | BIT_ULL(CAM_FORMAT_GBR_TP10) |
 				BIT_ULL(CAM_FORMAT_GBR_UBWC_TP10),
 		},
@@ -1615,7 +1616,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x00001E1C,
 			/* IMG comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP0 bits 3:0) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_TP10) |
+			.supported_formats        = BIT_ULL(CAM_FORMAT_TP10) |  BIT_ULL(CAM_FORMAT_PD10) |
 				BIT_ULL(CAM_FORMAT_UBWC_TP10) | BIT_ULL(CAM_FORMAT_GBR_TP10) |
 				BIT_ULL(CAM_FORMAT_GBR_UBWC_TP10),
 		},
@@ -1651,7 +1652,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x00001F1C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 17 STATS_BHIST_IR */
 		{
@@ -1684,7 +1685,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000201C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 18 STATS_BG_TINTLESS */
 		{
@@ -1717,7 +1718,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000211C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 19 STATS_BG_IRC_AEC */
 		{
@@ -1750,7 +1751,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000221C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 20 STATS_BHIST_IRC_AEC */
 		{
@@ -1783,7 +1784,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000231C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 21 STATS_BG_AEC */
 		{
@@ -1816,7 +1817,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000241C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 22 STATS_BHIST_AEC */
 		{
@@ -1849,7 +1850,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000251C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 23 STATS_BAYER_RS */
 		{
@@ -1882,7 +1883,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000261C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 24 STATS_BFW_AWB */
 		{
@@ -1916,7 +1917,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000271C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 25 STATS_BG_AWB */
 		{
@@ -1949,7 +1950,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000281C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 26 STATS_BHIST_TMC */
 		{
@@ -1982,7 +1983,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x0000291C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 27 STATS_BLTM */
 		{
@@ -2015,7 +2016,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.bw_limiter_addr           = 0x00002A1C,
 			/* STATS comp-done grp (CSID BUF_DONE_IRQ_STATUS SUBGRP1 bits 7:4) */
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.supported_formats        = BIT_ULL(CAM_FORMAT_PLAIN64),
+			.supported_formats        = 0xFFFFFFFFFFFFFFFF,
 		},
 		/* BUS Client 28 RDI_0 */
 		{
@@ -2439,19 +2440,19 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.mid           = vfe900_out_port_mid[0],
 			.num_mid       = 32,
 			/* 4th (UV) plane not driven yet - UAPI caps planes at 3; phase 2 */
-			.num_wm        = 3,
+			.num_wm        = 2,
 			.mc_based      = true,
 			.wm_idx        = {
 				0,
+				3,
 				1,
 				2,
-				3,
 			},
 			.name          = {
 				"FULL_Y",
+				"FULL_UV",
 				"FULL_C1",
 				"FULL_C2",
-				"FULL_UV",
 			},
 		},
 		{
@@ -2525,19 +2526,19 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.mid           = vfe900_out_port_mid[5],
 			.num_mid       = 32,
 			/* 4th (UV) plane not driven yet - UAPI caps planes at 3; phase 2 */
-			.num_wm        = 3,
+			.num_wm        = 2,
 			.mc_based      = true,
 			.wm_idx        = {
 				6,
+				9,
 				7,
 				8,
-				9,
 			},
 			.name          = {
 				"AI_OUT_1_Y",
+				"AI_OUT_1_UV",
 				"AI_OUT_1_C1",
 				"AI_OUT_1_C2",
-				"AI_OUT_1_UV",
 			},
 		},
 		{
@@ -2548,19 +2549,19 @@ static struct cam_vfe_bus_ver3_hw_info vfe900_bus_hw_info = {
 			.mid           = vfe900_out_port_mid[6],
 			.num_mid       = 32,
 			/* 4th (UV) plane not driven yet - UAPI caps planes at 3; phase 2 */
-			.num_wm        = 3,
+			.num_wm        = 2,
 			.mc_based      = true,
 			.wm_idx        = {
 				10,
+				13,
 				11,
 				12,
-				13,
 			},
 			.name          = {
 				"AI_OUT_2_Y",
+				"AI_OUT_2_UV",
 				"AI_OUT_2_C1",
 				"AI_OUT_2_C2",
-				"AI_OUT_2_UV",
 			},
 		},
 		{

@@ -3008,9 +3008,10 @@ static void cam_ife_csid_ver2_dump_imp_regs(
 
 	/* Dumping CSID reset cfg and dual csid cfg */
 	reset_cfg = cam_io_r_mb(mem_base + csid_reg->cmn_reg->reset_cfg_addr);
-	dual_csid_cfg = cam_io_r_mb(
-		soc_info->reg_map[CAM_IFE_CSID_TOP_MEM_BASE_ID].mem_base +
-		csid_reg->top_reg->dual_csid_cfg0_addr[hw_idx]);
+	if (csid_reg->top_reg)
+		dual_csid_cfg = cam_io_r_mb(
+			soc_info->reg_map[CAM_IFE_CSID_TOP_MEM_BASE_ID].mem_base +
+			csid_reg->top_reg->dual_csid_cfg0_addr[hw_idx]);
 	CAM_INFO(CAM_ISP,
 		"CSID[%d] csid reset_cfg 0x%x, dual_csid_cfg 0x%x, is_dual_en %d",
 		hw_idx, reset_cfg, dual_csid_cfg, csid_hw->top_cfg.dual_en);
@@ -4644,8 +4645,10 @@ static int cam_ife_csid_ver2_init_config_pxl_path(
 	}
 
 	/* For some targets, cfg1 register is programmed as part of cdm buffer, so skip here */
-	if (!(csid_reg->cmn_reg->capabilities & CAM_IFE_CSID_CAP_SKIP_PATH_CFG1))
-		rc = cam_ife_csid_ver2_program_init_cfg1_pxl_path(csid_hw, res);
+	if (!(csid_reg->cmn_reg->capabilities & CAM_IFE_CSID_CAP_SKIP_PATH_CFG1)) {
+		if (!csid_reg->ipp_mc_reg)
+			rc = cam_ife_csid_ver2_program_init_cfg1_pxl_path(csid_hw, res);
+	}
 
 	/* Enable the Pxl path */
 	val = cam_io_r_mb(mem_base + path_reg->cfg0_addr);
@@ -4900,7 +4903,7 @@ unsub_top:
 			path_cfg->top_irq_handle);
 	path_cfg->top_irq_handle = 0;
 unsub_mc:
-	cam_irq_controller_unsubscribe_irq(csid_hw->top_irq_controller,
+	cam_irq_controller_unsubscribe_irq(csid_hw->top_irq_controller[top_index],
 		csid_hw->top_mc_irq_handle);
 	csid_hw->top_mc_irq_handle = 0;
 end:
@@ -7646,10 +7649,42 @@ static int cam_ife_csid_ver2_dump_crop_reg(
 	path_cfg = (struct cam_ife_csid_ver2_path_cfg *)path_res->res_priv;
 	if (path_res->res_state == CAM_ISP_RESOURCE_STATE_STREAMING && path_cfg) {
 		path_reg = csid_reg->path_reg[*path_id];
-		hcrop = cam_io_r_mb(mem_base + path_reg->hcrop_addr);
-		vcrop = cam_io_r_mb(mem_base + path_reg->vcrop_addr);
 		cfg0 = cam_io_r_mb(mem_base + path_reg->cfg0_addr);
-		cfg1 = cam_io_r_mb(mem_base + path_reg->cfg1_addr);
+
+		if (csid_reg->ipp_mc_reg &&
+			(*path_id == CAM_IFE_PIX_PATH_RES_IPP ||
+			*path_id == CAM_IFE_PIX_PATH_RES_IPP_1 ||
+			*path_id == CAM_IFE_PIX_PATH_RES_IPP_2 ||
+			*path_id == CAM_IFE_PIX_PATH_RES_IPP_3)) {
+			const struct cam_ife_csid_ver2_mc_reg_info *mc_reg = csid_reg->ipp_mc_reg;
+			uint32_t ctxt_idx;
+
+			switch (*path_id) {
+			case CAM_IFE_PIX_PATH_RES_IPP_1:
+				ctxt_idx = 1;
+				break;
+			case CAM_IFE_PIX_PATH_RES_IPP_2:
+				ctxt_idx = 2;
+				break;
+			case CAM_IFE_PIX_PATH_RES_IPP_3:
+				ctxt_idx = 3;
+				break;
+			case CAM_IFE_PIX_PATH_RES_IPP:
+			default:
+				ctxt_idx = 0;
+				break;
+			}
+
+			cam_io_w_mb(ctxt_idx, mem_base + mc_reg->ctxt_rd_sel_addr);
+			hcrop = cam_io_r_mb(mem_base + mc_reg->hcrop_addr);
+			vcrop = cam_io_r_mb(mem_base + mc_reg->vcrop_addr);
+			cfg1 = cam_io_r_mb(mem_base + mc_reg->cfg1_addr);
+		} else {
+			hcrop = cam_io_r_mb(mem_base + path_reg->hcrop_addr);
+			vcrop = cam_io_r_mb(mem_base + path_reg->vcrop_addr);
+			cfg1 = cam_io_r_mb(mem_base + path_reg->cfg1_addr);
+		}
+
 		CAM_INFO(CAM_ISP, "CSID[%u] %s HCROP=0x%x VCROP=0x%x, CFG0=0x%x CFG1=0x%x",
 			csid_hw->hw_intf->hw_idx, path_res->res_name, hcrop, vcrop, cfg0, cfg1);
 		CAM_INFO(CAM_ISP, "CSID[%u] %s width=%d height=%d start line:%d end line:%d",
