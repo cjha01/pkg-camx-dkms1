@@ -149,6 +149,7 @@ static int cam_tfe_mgr_handle_reg_dump(struct cam_tfe_hw_mgr_ctx *ctx,
 	bool user_triggered_dump)
 {
 	int rc = -EINVAL, i;
+	struct cam_hw_soc_skip_dump_args skip_dump_args = {0};
 
 	if (!num_reg_dump_buf || !reg_dump_buf_desc) {
 		CAM_DBG(CAM_ISP,
@@ -171,6 +172,7 @@ static int cam_tfe_mgr_handle_reg_dump(struct cam_tfe_hw_mgr_ctx *ctx,
 				ctx->applied_req_id,
 				cam_tfe_mgr_regspace_data_cb,
 				soc_dump_args,
+				&skip_dump_args,
 				user_triggered_dump);
 			if (rc) {
 				CAM_ERR(CAM_ISP,

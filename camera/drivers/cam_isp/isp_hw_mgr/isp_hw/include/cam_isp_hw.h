@@ -660,6 +660,22 @@ struct cam_isp_hw_intf_data {
 	uint32_t                hw_pid[CAM_ISP_HW_MAX_PID_VAL];
 };
 /**
+ * struct cam_isp_hw_regiter_dump_data - ISP skip reg dump data
+ *
+ * @Brief:        ISP skip reg dump data
+ *
+ * @skip_regdump:              Regdump skip required for this target or not
+ * @skip_regdump_start_offset: Start register address which needs to skip register dump
+ * @skip_regdump_stop_offset:  Register address which needs to stop skiping register dump
+ *
+ */
+struct cam_isp_hw_regiter_dump_data {
+	bool                    skip_regdump;
+	uint32_t                skip_regdump_start_offset;
+	uint32_t                skip_regdump_stop_offset;
+};
+
+/**
  * struct cam_isp_hw_bus_cap:
  *
  * @Brief:         ISP hw bus capabilities
@@ -667,12 +683,14 @@ struct cam_isp_hw_intf_data {
  * @max_out_res_type:       Maximum value of out resource type supported by hw
  * @num_perf_counters:      Number of perf counters supported
  * @support_consumed_addr:  Indicate whether HW has last consumed addr reg
+ * @skip_regdump_data:      ISP skip reg dump data
  *
  */
 struct cam_isp_hw_cap {
-	uint32_t                max_out_res_type;
-	uint32_t                num_perf_counters;
-	bool                    support_consumed_addr;
+	uint32_t                             max_out_res_type;
+	uint32_t                             num_perf_counters;
+	bool                                 support_consumed_addr;
+	struct cam_isp_hw_regiter_dump_data  skip_regdump_data;
 };
 
 /**

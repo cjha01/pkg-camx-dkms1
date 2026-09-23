@@ -552,6 +552,7 @@ struct cam_ife_mgr_offline_in_queue {
  * @num_ife_perf_counters :  max ife perf counters supported
  * @num_sfe_perf_counters :  max sfe perf counters supported
  * @support_consumed_addr :  indicate whether hw supports last consumed address
+ * @skip_regdump_data     :  ISP skip reg dump data
  */
 struct cam_isp_ife_sfe_hw_caps {
 	uint32_t     max_vfe_out_res_type;
@@ -559,6 +560,7 @@ struct cam_isp_ife_sfe_hw_caps {
 	uint32_t     num_ife_perf_counters;
 	uint32_t     num_sfe_perf_counters;
 	bool         support_consumed_addr;
+	struct cam_isp_hw_regiter_dump_data skip_regdump_data;
 };
 
 /*

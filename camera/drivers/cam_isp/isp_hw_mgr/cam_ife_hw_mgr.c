@@ -488,6 +488,7 @@ static int cam_ife_mgr_handle_reg_dump(struct cam_ife_hw_mgr_ctx *ctx,
 	bool user_triggered_dump)
 {
 	struct cam_ife_hw_concrete_ctx *c_ctx = ctx->concr_ctx;
+	struct cam_hw_soc_skip_dump_args skip_dump_args = {0};
 	int rc = 0, i;
 
 	if (!c_ctx->flags.init_done) {
@@ -520,6 +521,16 @@ static int cam_ife_mgr_handle_reg_dump(struct cam_ife_hw_mgr_ctx *ctx,
 			"Reg dump values might be from more than one request, ctx_idx: %u",
 			c_ctx->ctx_index);
 
+	if ((meta_type != CAM_ISP_PACKET_META_REG_DUMP_ON_ERROR) &&
+		g_ife_hw_mgr.isp_caps.skip_regdump_data.skip_regdump) {
+		skip_dump_args.skip_regdump =
+			g_ife_hw_mgr.isp_caps.skip_regdump_data.skip_regdump;
+		skip_dump_args.start_offset =
+			g_ife_hw_mgr.isp_caps.skip_regdump_data.skip_regdump_start_offset;
+		skip_dump_args.stop_offset =
+			g_ife_hw_mgr.isp_caps.skip_regdump_data.skip_regdump_stop_offset;
+	}
+
 	for (i = 0; i < num_reg_dump_buf; i++) {
 		rc = cam_packet_util_validate_cmd_desc(&reg_dump_buf_desc[i]);
 		if (rc)
@@ -533,6 +544,7 @@ static int cam_ife_mgr_handle_reg_dump(struct cam_ife_hw_mgr_ctx *ctx,
 				c_ctx->applied_req_id,
 				cam_ife_mgr_regspace_data_cb,
 				soc_dump_args,
+				&skip_dump_args,
 				user_triggered_dump);
 			if (rc) {
 				CAM_ERR(CAM_ISP,
@@ -19781,6 +19793,8 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl,
 		isp_cap.max_out_res_type;
 	g_ife_hw_mgr.isp_caps.num_ife_perf_counters =
 		isp_cap.num_perf_counters;
+	g_ife_hw_mgr.isp_caps.skip_regdump_data =
+		isp_cap.skip_regdump_data;
 	max_ife_out_res =
 		g_ife_hw_mgr.isp_caps.max_vfe_out_res_type & 0xFF;
 	memset(&isp_cap, 0x0, sizeof(struct cam_isp_hw_cap));
