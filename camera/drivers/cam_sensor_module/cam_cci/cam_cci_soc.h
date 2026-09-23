@@ -32,8 +32,7 @@ int cam_cci_soc_release(struct cci_device *cci_dev,
  *
  * This API parses CCI device tree
  */
-int cam_cci_parse_dt_info(struct platform_device *pdev,
-	struct cci_device *new_cci_dev);
+int cam_cci_parse_dt_info(struct cci_device *new_cci_dev);
 
 /**
  * @pdev: Platform device
