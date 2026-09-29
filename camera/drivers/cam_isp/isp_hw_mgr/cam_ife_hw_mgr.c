@@ -4798,10 +4798,16 @@ int cam_ife_hw_mgr_acquire_res_ife_csid_rdi(
 		if (res_id == CAM_IFE_PIX_PATH_RES_MAX)
 			continue;
 		} else {
-			if (!cam_ife_csid_get_rdi_res_id_from_index(i, &res_id)) {
-				CAM_ERR(CAM_ISP, "Unsupported per-port RDI index:%d", i);
-				rc = -EINVAL;
-				break;
+			res_id = CAM_IFE_PIX_PATH_RES_RDI_0 + i;
+			if (res_id >= CAM_IFE_PIX_PATH_RES_RDI_3 &&
+				res_id <= CAM_IFE_PIX_PATH_RES_RDI_5) {
+				res_id = CAM_IFE_PIX_PATH_RES_RDI_1 + i;
+
+				if (res_id == CAM_IFE_PIX_PATH_RES_RDI_5) {
+					CAM_ERR(CAM_ISP, "Unsupported Usecase");
+					rc = -EINVAL;
+					break;
+				}
 			}
 		}
 
