@@ -9,6 +9,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/of_device.h>
 #include <linux/timer.h>
+#include <linux/firmware.h>
 #include "a5_core.h"
 #include "a5_soc.h"
 #include "cam_io_util.h"
