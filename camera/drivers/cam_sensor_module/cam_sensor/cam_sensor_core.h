@@ -15,6 +15,31 @@
  * This API powers up the camera sensor module
  */
 int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl);
+/**
+ * @s_ctrl:     Sensor ctrl structure
+ * @csl_packet: CSL packet containing regulator settings
+ * @cmd_desc:   Command buffer descriptor
+ * @io_cfg:     IO configuration
+ *
+ * This API enables sensor regulator rails on behalf of AON sensor
+ */
+int cam_sensor_aon_regulator_on(struct cam_sensor_ctrl_t *s_ctrl,
+	struct cam_packet *csl_packet,
+	struct cam_cmd_buf_desc *cmd_desc,
+	struct cam_buf_io_cfg *io_cfg);
+
+/**
+ * @s_ctrl:     Sensor ctrl structure
+ * @csl_packet: CSL packet containing regulator settings
+ * @cmd_desc:   Command buffer descriptor
+ * @io_cfg:     IO configuration
+ *
+ * This API disables sensor regulator rails on behalf of AON sensor
+ */
+int cam_sensor_aon_regulator_off(struct cam_sensor_ctrl_t *s_ctrl,
+	struct cam_packet *csl_packet,
+	struct cam_cmd_buf_desc *cmd_desc,
+	struct cam_buf_io_cfg *io_cfg);
 
 /**
  * @s_ctrl: Sensor ctrl structure

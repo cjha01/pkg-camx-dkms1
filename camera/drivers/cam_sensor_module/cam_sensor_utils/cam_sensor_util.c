@@ -2713,6 +2713,79 @@ msm_camera_get_power_settings(struct cam_sensor_power_ctrl_t *ctrl,
 	return ps;
 }
 
+/**
+ * cam_sensor_util_power_down_regulators - Disable only regulator rails
+ * @ctrl: power ctrl with regulator-only power_down_setting[] entries
+ * @soc_info: SOC info carrying regulator handles
+ *
+ * This helper is used only for regulator-only packet opcodes from userspace.
+ * It disables regulator rails and honors delays, but intentionally skips GPIO,
+ * MCLK, and pinctrl handling so the normal sensor power-down path remains
+ * unchanged.
+ */
+int cam_sensor_util_power_down_regulators(struct cam_sensor_power_ctrl_t *ctrl,
+		struct cam_hw_soc_info *soc_info)
+{
+	int index = 0, ret = 0, num_vreg = 0, vreg_idx;
+	struct cam_sensor_power_setting *power_setting = NULL;
+
+	CAM_DBG(CAM_SENSOR_UTIL, "Enter");
+	if (!ctrl || !soc_info) {
+		CAM_ERR(CAM_SENSOR_UTIL, "failed ctrl %pK", ctrl);
+		return -EINVAL;
+	}
+
+	num_vreg = soc_info->num_rgltr;
+	if ((num_vreg <= 0) || (num_vreg > CAM_SOC_MAX_REGULATOR)) {
+		CAM_ERR(CAM_SENSOR_UTIL, "failed: num_vreg %d", num_vreg);
+		return -EINVAL;
+	}
+
+	if (ctrl->power_down_setting_size > MAX_POWER_CONFIG) {
+		CAM_ERR(CAM_SENSOR_UTIL, "Invalid: power setting size %d",
+			ctrl->power_setting_size);
+		return -EINVAL;
+	}
+
+	for (index = 0; index < ctrl->power_down_setting_size; index++) {
+		power_setting = &ctrl->power_down_setting[index];
+		if (!power_setting) {
+			CAM_ERR(CAM_SENSOR_UTIL,
+				"Invalid power down settings for index %d", index);
+			return -EINVAL;
+		}
+
+		if (power_setting->seq_val == INVALID_VREG)
+			goto apply_delay;
+		if (power_setting->seq_val >= num_vreg)
+			goto apply_delay;
+		if (IS_ERR_OR_NULL(soc_info->rgltr[power_setting->seq_val]))
+			goto apply_delay;
+
+		vreg_idx = power_setting->seq_val;
+		ret = cam_soc_util_regulator_disable(
+			soc_info->rgltr[vreg_idx],
+			soc_info->rgltr_name[vreg_idx],
+			soc_info->rgltr_min_volt[vreg_idx],
+			soc_info->rgltr_max_volt[vreg_idx],
+			soc_info->rgltr_op_mode[vreg_idx],
+			soc_info->rgltr_delay[vreg_idx]);
+		if (ret)
+			CAM_ERR(CAM_SENSOR_UTIL,
+				"Regulator disable failed for %s rc=%d",
+				soc_info->rgltr_name[vreg_idx], ret);
+
+apply_delay:
+		if (power_setting->delay > 20)
+			msleep(power_setting->delay);
+		else if (power_setting->delay)
+			usleep_range(power_setting->delay * 1000,
+				(power_setting->delay * 1000) + 1000);
+	}
+
+	return ret;
+}
+
 int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 		struct cam_hw_soc_info *soc_info)
 {
