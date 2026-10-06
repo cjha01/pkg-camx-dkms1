@@ -8893,6 +8893,7 @@ static void cam_ife_hw_mgr_set_hw_debug_config(
 	csid_debug_args.csid_rx_capture_debug = hw_mgr->debug_cfg.rx_capture_debug;
 	csid_debug_args.rx_capture_debug_set = hw_mgr->debug_cfg.rx_capture_debug_set;
 	csid_debug_args.csid_testbus_debug = hw_mgr->debug_cfg.csid_test_bus;
+	csid_debug_args.enable_cdr_sweep_debug = hw_mgr->debug_cfg.enable_cdr_sweep_debug;
 
 	/* Set SFE debug args */
 	sfe_debug_args.cache_config = false;
@@ -18896,6 +18897,9 @@ static int cam_ife_hw_mgr_debug_register(void)
 		g_ife_hw_mgr.debug_cfg.dentry, NULL, &cam_isp_irq_injection);
 	debugfs_create_bool("enable_cdm_cmd_check", 0644, g_ife_hw_mgr.debug_cfg.dentry,
 		&g_ife_hw_mgr.debug_cfg.enable_cdm_cmd_check);
+	debugfs_create_bool("enable_cdr_sweep_debug", 0644,
+		g_ife_hw_mgr.debug_cfg.dentry,
+		&g_ife_hw_mgr.debug_cfg.enable_cdr_sweep_debug);
 end:
 	g_ife_hw_mgr.debug_cfg.enable_csid_recovery = 1;
 	return rc;

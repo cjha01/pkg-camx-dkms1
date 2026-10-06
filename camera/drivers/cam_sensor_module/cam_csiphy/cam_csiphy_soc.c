@@ -74,6 +74,109 @@ static int cam_csiphy_io_dump(void __iomem *base_addr, uint16_t num_regs, int cs
 	return 0;
 }
 
+int32_t cam_csiphy_common_status_reg_dump(struct csiphy_device *csiphy_dev,
+	bool dump_to_log)
+{
+	struct csiphy_reg_parms_t *csiphy_reg = NULL;
+	int32_t                    rc = 0;
+	resource_size_t            size = 0;
+	void __iomem              *phy_base = NULL;
+	int                        reg_id = 0;
+	uint32_t                   val, status_reg, clear_reg;
+	unsigned int              *buffer;
+
+	if (!csiphy_dev) {
+		rc = -EINVAL;
+		CAM_ERR(CAM_CSIPHY, "invalid input %d", rc);
+		return rc;
+	}
+
+	csiphy_reg = csiphy_dev->ctrl_reg->csiphy_reg;
+	phy_base = csiphy_dev->soc_info.reg_map[0].mem_base;
+	status_reg = csiphy_reg->mipi_csiphy_interrupt_status0_addr;
+	clear_reg = csiphy_reg->mipi_csiphy_interrupt_clear0_addr;
+	buffer = csiphy_dev->qmargin_data.csiphy_qmargin_output_regs;
+	size = dump_to_log ? csiphy_reg->csiphy_num_common_status_regs :
+		CSIPHY_QMARGIN_CMN_STATUS_REG_COUNT;
+
+	if (dump_to_log)
+		CAM_INFO(CAM_CSIPHY, "PHY base addr=%pK offset=0x%x size=%d",
+			phy_base, status_reg, size);
+
+	if (unlikely(!phy_base)) {
+		CAM_ERR(CAM_CSIPHY, "phy base is NULL  %s", CAM_BOOL_TO_YESNO(phy_base));
+		return -EINVAL;
+	}
+
+	if (unlikely(!size || !buffer)) {
+		CAM_ERR(CAM_CSIPHY, "Common status read buffer is NULL: %s, reg reads: %d",
+			CAM_BOOL_TO_YESNO(buffer), size);
+		return -EINVAL;
+	}
+
+	for (reg_id = 0; reg_id < size; reg_id++) {
+		val = cam_io_r(phy_base + status_reg + (0x4 * reg_id));
+
+		if (reg_id < csiphy_reg->csiphy_interrupt_status_size)
+			cam_io_w_mb(val, phy_base + clear_reg + (0x4 * reg_id));
+
+		if (dump_to_log)
+			CAM_INFO(CAM_CSIPHY, "CSIPHY%d_COMMON_STATUS%u = 0x%x",
+				csiphy_dev->soc_info.index, reg_id, val);
+		if (buffer && (reg_id < CSIPHY_QMARGIN_CMN_STATUS_REG_COUNT))
+			buffer[reg_id] = val;
+	}
+
+	/*
+	 * For 2-phase (DPHY) mode, capture 2PHASE_STATUS8 and STATUS9 for
+	 * each data lane (LN0-LN3) and the clock lane, using the same lane
+	 * base offset calculation as cam_csiphy_dump_status_reg():
+	 *   lane0_base = phy_base + csiphy_2ph_status0_offset
+	 *   laneN_base = lane(N-1)_base + size_offset_betn_lanes
+	 *   clk_base   = lane3_base + size_offset_betn_lanes / 2
+	 * STATUS8 is at lane_base + (8 * 4), STATUS9 at lane_base + (9 * 4).
+	 */
+	if (!g_phy_data[csiphy_dev->soc_info.index].is_3phase) {
+		struct cam_cphy_dphy_status_reg_params_t *status_regs =
+			csiphy_reg->status_reg_params;
+		void __iomem *lane0_base, *lane1_base, *lane2_base,
+			     *lane3_base, *clk_base;
+
+		/* Capture combo mode status for qmargin reporting */
+		csiphy_dev->qmargin_data.is_combo_mode = csiphy_dev->combo_mode;
+
+		lane0_base = phy_base + status_regs->csiphy_2ph_status0_offset;
+		lane1_base = lane0_base + csiphy_reg->size_offset_betn_lanes;
+		lane2_base = lane1_base + csiphy_reg->size_offset_betn_lanes;
+		lane3_base = lane2_base + csiphy_reg->size_offset_betn_lanes;
+		clk_base   = lane3_base + (csiphy_reg->size_offset_betn_lanes / 2);
+
+		csiphy_dev->qmargin_data.ln_2ph_calibration_status[0] =
+			cam_io_r(lane0_base + status_regs->csiphy_2ph_cal_status_offset);
+		csiphy_dev->qmargin_data.ln_2ph_calibration_status[1] =
+			cam_io_r(lane1_base + status_regs->csiphy_2ph_cal_status_offset);
+		csiphy_dev->qmargin_data.ln_2ph_calibration_status[2] =
+			cam_io_r(lane2_base + status_regs->csiphy_2ph_cal_status_offset);
+		csiphy_dev->qmargin_data.ln_2ph_calibration_status[3] =
+			cam_io_r(lane3_base + status_regs->csiphy_2ph_cal_status_offset);
+		csiphy_dev->qmargin_data.ln_2ph_calibration_status[4] =
+			cam_io_r(clk_base   + status_regs->csiphy_2ph_cal_status_offset);
+
+		csiphy_dev->qmargin_data.ln_2ph_deskew_cal_code[0] =
+			cam_io_r(lane0_base + status_regs->csiphy_2ph_cal_code_offset);
+		csiphy_dev->qmargin_data.ln_2ph_deskew_cal_code[1] =
+			cam_io_r(lane1_base + status_regs->csiphy_2ph_cal_code_offset);
+		csiphy_dev->qmargin_data.ln_2ph_deskew_cal_code[2] =
+			cam_io_r(lane2_base + status_regs->csiphy_2ph_cal_code_offset);
+		csiphy_dev->qmargin_data.ln_2ph_deskew_cal_code[3] =
+			cam_io_r(lane3_base + status_regs->csiphy_2ph_cal_code_offset);
+		csiphy_dev->qmargin_data.ln_2ph_deskew_cal_code[4] =
+			cam_io_r(clk_base   + status_regs->csiphy_2ph_cal_code_offset);
+	}
+
+	return rc;
+}
+
 int32_t cam_csiphy_reg_dump(struct cam_hw_soc_info *soc_info)
 {
 	int32_t rc = 0;
@@ -90,48 +193,6 @@ int32_t cam_csiphy_reg_dump(struct cam_hw_soc_info *soc_info)
 	rc = cam_csiphy_io_dump(addr, (size >> 2), soc_info->index);
 	if (rc < 0) {
 		CAM_ERR(CAM_CSIPHY, "generating dump failed %d", rc);
-		return rc;
-	}
-	return rc;
-}
-
-int32_t cam_csiphy_common_status_reg_dump(struct csiphy_device *csiphy_dev)
-{
-	struct csiphy_reg_parms_t *csiphy_reg = NULL;
-	int32_t                    rc = 0;
-	resource_size_t            size = 0;
-	void __iomem              *phy_base = NULL;
-	int                        reg_id = 0;
-	uint32_t                   val, status_reg, clear_reg;
-
-	if (!csiphy_dev) {
-		rc = -EINVAL;
-		CAM_ERR(CAM_CSIPHY, "invalid input %d", rc);
-		return rc;
-	}
-
-	csiphy_reg = csiphy_dev->ctrl_reg->csiphy_reg;
-	phy_base = csiphy_dev->soc_info.reg_map[0].mem_base;
-	status_reg = csiphy_reg->mipi_csiphy_interrupt_status0_addr;
-	clear_reg = csiphy_reg->mipi_csiphy_interrupt_clear0_addr;
-	size = csiphy_reg->csiphy_num_common_status_regs;
-
-	CAM_INFO(CAM_CSIPHY, "PHY base addr=%pK offset=0x%x size=%d",
-		phy_base, status_reg, size);
-
-	if (phy_base != NULL) {
-		for (reg_id = 0; reg_id < size; reg_id++) {
-			val = cam_io_r(phy_base + status_reg + (0x4 * reg_id));
-
-			if (reg_id < csiphy_reg->csiphy_interrupt_status_size)
-				cam_io_w_mb(val, phy_base + clear_reg + (0x4 * reg_id));
-
-			CAM_INFO(CAM_CSIPHY, "CSIPHY%d_COMMON_STATUS%u = 0x%x",
-				csiphy_dev->soc_info.index, reg_id, val);
-		}
-	} else {
-		rc = -EINVAL;
-		CAM_ERR(CAM_CSIPHY, "phy base is NULL  %d", rc);
 		return rc;
 	}
 	return rc;

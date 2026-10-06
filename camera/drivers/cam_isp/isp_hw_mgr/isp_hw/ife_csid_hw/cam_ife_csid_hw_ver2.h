@@ -85,6 +85,7 @@ struct cam_ife_csid_ver2_debug_info {
 	uint32_t                              test_bus_val;
 	bool                                  rx_capture_debug_set;
 	bool                                  test_bus_enabled;
+	bool                                  cdr_sweep_debug_enabled;
 };
 
 struct cam_ife_csid_ver2_top_cfg {
