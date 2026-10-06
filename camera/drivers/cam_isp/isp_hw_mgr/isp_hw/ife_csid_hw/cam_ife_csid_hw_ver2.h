@@ -377,6 +377,15 @@ struct cam_ife_csid_ver2_mc_reg_info {
 	uint32_t           comp_rup_mask;
 	uint32_t           comp_subgrp0_mask;
 	uint32_t           comp_subgrp2_mask;
+	uint32_t           ctxt_rd_sel_addr;
+	uint32_t           cfg1_addr;
+	uint32_t           hcrop_addr;
+	uint32_t           vcrop_addr;
+	uint32_t           pix_drop_pattern_addr;
+	uint32_t           pix_drop_period_addr;
+	uint32_t           line_drop_pattern_addr;
+	uint32_t           line_drop_period_addr;
+	uint32_t           pix_store_cfg0_addr;
 };
 
 struct cam_ife_csid_ver2_path_reg_info {

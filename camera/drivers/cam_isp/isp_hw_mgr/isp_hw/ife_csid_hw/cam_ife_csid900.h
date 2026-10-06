@@ -669,7 +669,7 @@ static struct cam_ife_csid_ver2_csi2_rx_reg_info
 		.part_fatal_err_mask             = {0x000FF000, 0x0,},
 		.non_fatal_err_mask              = {0x08000000, 0x0,},
 		.top_irq_mask                    = {0x4, 0x0,},
-		.rx_rx2_irq_mask                 = 0x80000000,
+		.rx_rx2_irq_mask                 = 0x18,
 };
 
 static struct cam_ife_csid_ver2_common_reg_info
@@ -797,7 +797,8 @@ static struct cam_ife_csid_ver2_common_reg_info
 	.top_buf_done_irq_mask                   = 0x8, /* BUF_DONE=bit3; 0x4000 was 690 clone */
 	.phy_sel_base_idx                        = 1,
 	.camif_irq_support                       = true,
-	.capabilities                            = CAM_IFE_CSID_CAP_SPLIT_RUP_AUP,
+	.capabilities                            = CAM_IFE_CSID_CAP_SPLIT_RUP_AUP |
+							CAM_IFE_CSID_CAP_SKIP_EPOCH_CFG,
 	.top_top2_irq_mask                       = 0x80000000,
 };
 
@@ -1392,8 +1393,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -1497,8 +1497,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -1602,8 +1601,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -1707,8 +1705,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -1812,8 +1809,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -1917,8 +1913,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -2022,8 +2017,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -2127,8 +2121,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -2232,8 +2225,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -2337,8 +2329,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -2442,8 +2433,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -2547,8 +2537,7 @@ static struct cam_ife_csid_ver2_path_reg_info
 		/* configurations */
 		.resume_frame_boundary            = 1,
 		.overflow_ctrl_en                 = 0,
-		.capabilities                     = CAM_IFE_CSID_CAP_RDI_UNPACK_MSB |
-			CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
+		.capabilities                     = CAM_IFE_CSID_CAP_SOF_RETIME_DIS,
 		.overflow_ctrl_mode_val           = 0x8,
 		.offline_mode_supported           = 1,
 		.mipi_pack_supported              = 1,
@@ -2669,6 +2658,15 @@ static struct cam_ife_csid_ver2_mc_reg_info
 	.comp_sof_mask           = 0x40000000,
 	.comp_subgrp0_mask       = 0x1000000,
 	.comp_subgrp2_mask       = 0x2000000,
+	.ctxt_rd_sel_addr        = 0x3E0,
+	.cfg1_addr               = 0xFF4,
+	.pix_store_cfg0_addr     = 0xFF8,
+	.hcrop_addr              = 0x1000,
+	.vcrop_addr              = 0x1004,
+	.pix_drop_pattern_addr   = 0x1008,
+	.pix_drop_period_addr    = 0x100C,
+	.line_drop_pattern_addr  = 0x1010,
+	.line_drop_period_addr   = 0x1014,
 };
 
 static struct cam_ife_csid_ver2_reg_info cam_ife_csid_900_reg_info = {
