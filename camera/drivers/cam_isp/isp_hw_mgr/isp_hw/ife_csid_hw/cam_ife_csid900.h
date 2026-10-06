@@ -2669,6 +2669,21 @@ static struct cam_ife_csid_ver2_mc_reg_info
 	.line_drop_period_addr   = 0x1014,
 };
 
+static struct cam_ife_csid_ver2_domain_id_reg_info
+			cam_ife_csid_900_domain_id_reg_info = {
+	.sec_ctrl_size = 0x10,
+	.cfg0_addr = 0x0,
+	.cfg1_addr = 0x4,
+	.cfg2_addr = 0x8,
+	.cfg3_addr = 0xC,
+	.cfg_val_mask = BIT(0) | BIT(8) | BIT(16) | BIT(24),
+	.sec_ctrl_base = {
+		0x09b31000,
+		0x09b37800,
+		0x09b3e000,
+	},
+};
+
 static struct cam_ife_csid_ver2_reg_info cam_ife_csid_900_reg_info = {
 	.top_irq_reg_info      = cam_ife_csid_900_top_irq_reg_info,
 	.rx_irq_reg_info       = cam_ife_csid_900_rx_irq_reg_info,
@@ -2714,6 +2729,7 @@ static struct cam_ife_csid_ver2_reg_info cam_ife_csid_900_reg_info = {
 	.path_reg[CAM_IFE_PIX_PATH_RES_RDI_10] = &cam_ife_csid_900_rdi_10_reg_info,
 	.path_reg[CAM_IFE_PIX_PATH_RES_RDI_11] = &cam_ife_csid_900_rdi_11_reg_info,
 	.ipp_mc_reg                            = &cam_ife_csid_900_ipp_mc_reg_info,
+	.domain_id_reg                         = &cam_ife_csid_900_domain_id_reg_info,
 	.need_top_cfg = 0x0,
 	.csid_cust_node_map = {0x1, 0x0, 0x2},
 	.rx_irq_desc        = &cam_ife_csid_900_rx_irq_desc,

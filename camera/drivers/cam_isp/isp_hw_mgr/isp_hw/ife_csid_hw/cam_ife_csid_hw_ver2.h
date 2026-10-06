@@ -388,6 +388,16 @@ struct cam_ife_csid_ver2_mc_reg_info {
 	uint32_t           pix_store_cfg0_addr;
 };
 
+struct cam_ife_csid_ver2_domain_id_reg_info {
+	uint32_t sec_ctrl_size;
+	uint32_t cfg0_addr;
+	uint32_t cfg1_addr;
+	uint32_t cfg2_addr;
+	uint32_t cfg3_addr;
+	uint32_t cfg_val_mask;
+	uint32_t sec_ctrl_base[CAM_IFE_CSID_HW_NUM_MAX];
+};
+
 struct cam_ife_csid_ver2_path_reg_info {
 	uint32_t irq_status_addr;
 	uint32_t irq_mask_addr;
@@ -742,6 +752,7 @@ struct cam_ife_csid_ver2_reg_info {
 						    CAM_IFE_PIX_PATH_RES_MAX];
 	const struct cam_ife_csid_ver2_top_reg_info      *top_reg;
 	const struct cam_ife_csid_ver2_mc_reg_info       *ipp_mc_reg;
+	const struct cam_ife_csid_ver2_domain_id_reg_info *domain_id_reg;
 	const uint32_t                                    need_top_cfg;
 	const uint32_t                                    csid_cust_node_map[
 		    CAM_IFE_CSID_HW_NUM_MAX];

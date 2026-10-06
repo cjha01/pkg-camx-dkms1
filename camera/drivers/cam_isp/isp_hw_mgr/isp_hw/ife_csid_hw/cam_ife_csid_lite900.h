@@ -1530,6 +1530,7 @@ static struct cam_ife_csid_ver2_reg_info cam_ife_csid_lite_900_reg_info = {
 	.path_reg[CAM_IFE_PIX_PATH_RES_RDI_5] = &cam_ife_csid_lite_900_rdi_5_reg_info,
 	.path_reg[CAM_IFE_PIX_PATH_RES_RDI_6] = &cam_ife_csid_lite_900_rdi_6_reg_info,
 	.path_reg[CAM_IFE_PIX_PATH_RES_RDI_7] = &cam_ife_csid_lite_900_rdi_7_reg_info,
+	.domain_id_reg                        = NULL,
 	.need_top_cfg = 0,
 	.rx_irq_desc        = &cam_ife_csid_lite_900_rx_irq_desc,
 	.path_irq_desc      = cam_ife_csid_lite_900_path_irq_desc,

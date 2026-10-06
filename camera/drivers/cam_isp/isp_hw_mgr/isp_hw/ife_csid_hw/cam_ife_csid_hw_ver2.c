@@ -6434,6 +6434,68 @@ static void cam_ife_csid_ver2_send_secure_info(
 
 }
 
+static int cam_ife_csid_ver2_configure_v900_domain_id(
+	const struct cam_ife_csid_ver2_reg_info *csid_reg,
+	uint32_t hw_idx,
+	uint32_t res_id)
+{
+	const struct cam_ife_csid_ver2_domain_id_reg_info *domain_id_reg =
+		csid_reg->domain_id_reg;
+	void __iomem *sec_base;
+	uint32_t cfg_addr = 0;
+	uint32_t cfg_val = 0;
+
+	if (!domain_id_reg || !domain_id_reg->sec_ctrl_base[hw_idx]) {
+		CAM_DBG(CAM_ISP, "domain id register not found");
+		return 0;
+	}
+
+	sec_base = ioremap(domain_id_reg->sec_ctrl_base[hw_idx],
+		domain_id_reg->sec_ctrl_size);
+	if (!sec_base)
+		return -EINVAL;
+
+	switch (res_id) {
+	case CAM_IFE_PIX_PATH_RES_IPP:
+	case CAM_IFE_PIX_PATH_RES_IPP_1:
+	case CAM_IFE_PIX_PATH_RES_IPP_2:
+	case CAM_IFE_PIX_PATH_RES_IPP_3:
+		cfg_addr = domain_id_reg->cfg0_addr;
+		cfg_val = domain_id_reg->cfg_val_mask;
+		break;
+	case CAM_IFE_PIX_PATH_RES_RDI_0:
+	case CAM_IFE_PIX_PATH_RES_RDI_1:
+	case CAM_IFE_PIX_PATH_RES_RDI_2:
+	case CAM_IFE_PIX_PATH_RES_RDI_3:
+		cfg_addr = domain_id_reg->cfg1_addr;
+		cfg_val = domain_id_reg->cfg_val_mask;
+		break;
+	case CAM_IFE_PIX_PATH_RES_RDI_4:
+	case CAM_IFE_PIX_PATH_RES_RDI_5:
+	case CAM_IFE_PIX_PATH_RES_RDI_6:
+	case CAM_IFE_PIX_PATH_RES_RDI_7:
+		cfg_addr = domain_id_reg->cfg2_addr;
+		cfg_val = domain_id_reg->cfg_val_mask;
+		break;
+	case CAM_IFE_PIX_PATH_RES_RDI_8:
+	case CAM_IFE_PIX_PATH_RES_RDI_9:
+	case CAM_IFE_PIX_PATH_RES_RDI_10:
+	case CAM_IFE_PIX_PATH_RES_RDI_11:
+		cfg_addr = domain_id_reg->cfg3_addr;
+		cfg_val = domain_id_reg->cfg_val_mask;
+		break;
+	default:
+		iounmap(sec_base);
+		return 0;
+	}
+
+	CAM_DBG(CAM_ISP, "writing 0x%x value to 0x%x reg", cfg_val, cfg_addr);
+	cam_io_w_mb(cfg_val, sec_base + cfg_addr);
+
+	iounmap(sec_base);
+	return 0;
+}
+
 static int cam_ife_csid_ver2_start(void *hw_priv, void *args,
 			uint32_t arg_size)
 {
@@ -6543,6 +6605,10 @@ static int cam_ife_csid_ver2_start(void *hw_priv, void *args,
 			if (rc)
 				goto end;
 
+			rc = cam_ife_csid_ver2_configure_v900_domain_id(csid_reg,
+				csid_hw->hw_intf->hw_idx, res->res_id);
+			if (rc)
+				goto end;
 			break;
 		case  CAM_IFE_PIX_PATH_RES_PPP:
 			rc = cam_ife_csid_ver2_program_ppp_path(csid_hw, res, &rup_aup_mask);
@@ -6566,6 +6632,10 @@ static int cam_ife_csid_ver2_start(void *hw_priv, void *args,
 			if (rc)
 				goto end;
 
+			rc = cam_ife_csid_ver2_configure_v900_domain_id(csid_reg,
+				csid_hw->hw_intf->hw_idx, res->res_id);
+			if (rc)
+				goto end;
 			break;
 		default:
 			CAM_ERR(CAM_ISP, "CSID:%u Invalid res type %d",
