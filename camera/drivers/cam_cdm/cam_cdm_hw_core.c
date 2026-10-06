@@ -709,13 +709,11 @@ static int cam_hw_cdm_set_cdm_core_cfg(struct cam_hw_info *cdm_hw)
 	}
 
 	if (cdm_version >= CAM_CDM_VERSION_2_0) {
-		if (core->id != CAM_CDM_CPAS &&
-			(!pvt_data->is_single_ctx_cdm))
+		if (core->id == CAM_CDM_OPE)
 			cfg_mask = cfg_mask | CAM_CDM_IMPLICIT_WAIT_EN;
 
 		if (core->arbitration == CAM_CDM_ARBITRATION_ROUND_ROBIN)
 			cfg_mask = cfg_mask | CAM_CDM_ARB_SEL_RR;
-
 	}
 
 	/*
