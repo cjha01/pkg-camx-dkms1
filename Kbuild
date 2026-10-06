@@ -413,6 +413,9 @@ camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_SFE) += \
 	camera_kt/drivers/cam_isp/isp_hw_mgr/isp_hw/sfe_hw/sfe_bus/cam_sfe_bus_rd.o \
 	camera_kt/drivers/cam_isp/isp_hw_mgr/isp_hw/sfe_hw/sfe_bus/cam_sfe_bus_wr.o
 
+camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_SENSOR_SYSFS_UTIL) += \
+	camera_kt/drivers/cam_sensor_module/cam_cci/cam_cci_sysfs_util.o
+
 camera_$(CAMERA_ARCH)-y += camera_kt/drivers/camera_main.o
 
 obj-m += camera_$(CAMERA_ARCH).o
