@@ -14,9 +14,11 @@
 #include "cam_packet_util.h"
 #include "cam_req_mgr_dev.h"
 #include "cam_sensor_dev.h"
+#include <linux/pm_wakeup.h>
 
 #define CAM_SENSOR_PIPELINE_DELAY_MASK        0xFF
 #define CAM_SENSOR_MODESWITCH_DELAY_SHIFT     8
+#define CAM_SENSOR_AON_POWER_TOGGLE_MARKER    0x414F4E50U
 
 static int cam_sensor_notify_v4l2_error_event(
 	struct cam_sensor_ctrl_t *s_ctrl,
@@ -156,6 +158,30 @@ static void cam_sensor_release_per_frame_resource(
 			}
 		}
 	}
+}
+
+static int cam_sensor_partial_bridge_ensure_aon_owner(
+	struct cam_sensor_ctrl_t *s_ctrl)
+{
+	int rc;
+	uint32_t csiphy_idx;
+
+	if (s_ctrl->aon_camera_id == NOT_AON_CAM)
+		return 0;
+
+	csiphy_idx = s_ctrl->sensordata->subdev_id[SUB_MODULE_CSIPHY];
+	CAM_INFO(CAM_SENSOR,
+		"%s: ensuring AON owns CPAS mux before regulator-only power toggle on csiphy index %u",
+		s_ctrl->sensor_name,
+		csiphy_idx);
+
+	rc = cam_sensor_util_aon_ops(false, csiphy_idx);
+	if (rc)
+		CAM_ERR(CAM_SENSOR,
+			"%s: failed to restore AON ownership before power toggle rc=%d",
+			s_ctrl->sensor_name, rc);
+
+	return rc;
 }
 
 static int cam_sensor_handle_res_info(struct cam_sensor_res_info *res_info,
@@ -473,6 +499,83 @@ static int32_t cam_sensor_pkt_parse(struct cam_sensor_ctrl_t *s_ctrl,
 				"Failed in adding request to req_mgr");
 		goto end;
 	}
+	case CAM_SENSOR_PACKET_OPCODE_SENSOR_REGULATOR_ON:
+	case CAM_SENSOR_PACKET_OPCODE_SENSOR_REGULATOR_OFF:
+	case CAM_SENSOR_PACKET_OPCODE_AON_PARTIAL_BRIDGE_ENABLE:
+	case CAM_SENSOR_PACKET_OPCODE_AON_PARTIAL_BRIDGE_DISABLE:
+
+		switch (csl_packet->header.op_code & 0xFFFFFF) {
+		case CAM_SENSOR_PACKET_OPCODE_SENSOR_REGULATOR_OFF:
+			rc = cam_sensor_partial_bridge_ensure_aon_owner(s_ctrl);
+			if (rc < 0)
+				goto end;
+
+			rc = cam_sensor_aon_regulator_off(s_ctrl, csl_packet, cmd_desc, io_cfg);
+			if (rc < 0)
+				CAM_ERR(CAM_SENSOR,
+					"%s: AON REGULATOR_OFF failed rc=%d",
+					s_ctrl->sensor_name, rc);
+			else {
+				s_ctrl->sensor_state = CAM_SENSOR_STANDBY;
+				CAM_INFO(CAM_SENSOR, "%s: AON REGULATOR_OFF succeeded",
+					 s_ctrl->sensor_name);
+			}
+			goto end;
+
+		case CAM_SENSOR_PACKET_OPCODE_SENSOR_REGULATOR_ON:
+			rc = cam_sensor_partial_bridge_ensure_aon_owner(s_ctrl);
+			if (rc < 0)
+				goto end;
+
+			rc = cam_sensor_aon_regulator_on(s_ctrl, csl_packet, cmd_desc, io_cfg);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"%s: AON REGULATOR_ON failed rc=%d",
+					s_ctrl->sensor_name, rc);
+			} else {
+				if (s_ctrl->sensor_state == CAM_SENSOR_STANDBY)
+					s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
+				CAM_INFO(CAM_SENSOR, "%s: AON REGULATOR_ON succeeded",
+					 s_ctrl->sensor_name);
+			}
+			goto end;
+
+		case CAM_SENSOR_PACKET_OPCODE_AON_PARTIAL_BRIDGE_ENABLE:
+			rc = cam_sensor_partial_bridge_ensure_aon_owner(s_ctrl);
+			if (rc < 0)
+				goto end;
+
+			if (!s_ctrl->aon_partial_bridge_active) {
+				if (!s_ctrl->aon_ws)
+					s_ctrl->aon_ws = wakeup_source_register(
+						s_ctrl->soc_info.dev,
+						"cam_aon_partial_bridge");
+				if (s_ctrl->aon_ws) {
+					__pm_stay_awake(s_ctrl->aon_ws);
+					s_ctrl->aon_partial_bridge_active = true;
+					CAM_INFO(CAM_SENSOR,
+						 "%s: AON partial bridge wakelock acquired",
+						 s_ctrl->sensor_name);
+				} else {
+					CAM_ERR(CAM_SENSOR,
+						"%s: failed to register AON wakeup source",
+						s_ctrl->sensor_name);
+					rc = -ENOMEM;
+				}
+			}
+			goto end;
+
+		case CAM_SENSOR_PACKET_OPCODE_AON_PARTIAL_BRIDGE_DISABLE:
+			if (s_ctrl->aon_partial_bridge_active && s_ctrl->aon_ws) {
+				__pm_relax(s_ctrl->aon_ws);
+				s_ctrl->aon_partial_bridge_active = false;
+				CAM_INFO(CAM_SENSOR,
+					 "%s: AON partial bridge wakelock released",
+					 s_ctrl->sensor_name);
+			}
+			goto end;
+		}
+		goto end;
 	default:
 		CAM_ERR(CAM_SENSOR, "Invalid Packet Header opcode: %d",
 			csl_packet->header.op_code & 0xFFFFFF);
@@ -1365,15 +1468,33 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
-		rc = cam_sensor_power_up(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Sensor Power up failed for %s sensor_id:0x%x, slave_addr:0x%x",
-				s_ctrl->sensor_name,
-				s_ctrl->sensordata->slave_info.sensor_id,
-				s_ctrl->sensordata->slave_info.sensor_slave_addr
-				);
-			goto release_mutex;
+		s_ctrl->aon_pmic_bridge_required =
+			(sensor_acq_dev.reserved == CAM_SENSOR_AON_POWER_TOGGLE_MARKER);
+		if (sensor_acq_dev.reserved &&
+			sensor_acq_dev.reserved != CAM_SENSOR_AON_POWER_TOGGLE_MARKER) {
+			CAM_WARN(CAM_SENSOR,
+				"%s acquire reserved marker 0x%x is unknown, treating as normal acquire",
+				s_ctrl->sensor_name, sensor_acq_dev.reserved);
+		}
+		if (s_ctrl->aon_pmic_bridge_required)
+			CAM_INFO(CAM_SENSOR,
+				"%s acquire requested for AON power-toggle helper",
+				s_ctrl->sensor_name);
+
+		if (!s_ctrl->aon_pmic_bridge_required) {
+			rc = cam_sensor_power_up(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"Sensor Power up failed for %s sensor_id:0x%x, slave_addr:0x%x",
+					s_ctrl->sensor_name,
+					s_ctrl->sensordata->slave_info.sensor_id,
+					s_ctrl->sensordata->slave_info.sensor_slave_addr);
+				goto release_mutex;
+			}
+		} else {
+			CAM_INFO(CAM_SENSOR,
+				"%s acquire without sensor power sequence",
+				s_ctrl->sensor_name);
 		}
 
 		s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
@@ -1410,15 +1531,20 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
-		rc = cam_sensor_power_down(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Sensor Power Down failed for %s sensor_id: 0x%x, slave_addr:0x%x",
-				s_ctrl->sensor_name,
-				s_ctrl->sensordata->slave_info.sensor_id,
-				s_ctrl->sensordata->slave_info.sensor_slave_addr
-				);
-			goto release_mutex;
+		if (!s_ctrl->aon_pmic_bridge_required) {
+			rc = cam_sensor_power_down(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"Sensor Power Down failed for %s sensor_id: 0x%x, slave_addr:0x%x",
+					s_ctrl->sensor_name,
+					s_ctrl->sensordata->slave_info.sensor_id,
+					s_ctrl->sensordata->slave_info.sensor_slave_addr);
+				goto release_mutex;
+			}
+		} else {
+			CAM_INFO(CAM_SENSOR,
+				"%s release without sensor power sequence",
+				s_ctrl->sensor_name);
 		}
 
 		cam_sensor_release_per_frame_resource(s_ctrl);
@@ -1442,6 +1568,21 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->bridge_intf.session_hdl = -1;
 
 		s_ctrl->sensor_state = CAM_SENSOR_INIT;
+
+		/* Release AON partial bridge wakelock if still held */
+		if (s_ctrl->aon_partial_bridge_active && s_ctrl->aon_ws) {
+			__pm_relax(s_ctrl->aon_ws);
+			s_ctrl->aon_partial_bridge_active = false;
+			CAM_INFO(CAM_SENSOR,
+				 "%s: AON partial bridge wakelock released on RELEASE_DEV",
+				 s_ctrl->sensor_name);
+		}
+		if (s_ctrl->aon_ws) {
+			wakeup_source_unregister(s_ctrl->aon_ws);
+			s_ctrl->aon_ws = NULL;
+		}
+		s_ctrl->aon_pmic_bridge_required = false;
+
 		CAM_INFO(CAM_SENSOR,
 			"CAM_RELEASE_DEV Success for %s sensor_id:0x%x, slave_addr:0x%x",
 			s_ctrl->sensor_name,
@@ -1641,6 +1782,14 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			s_ctrl->sensordata->slave_info.sensor_slave_addr);
 	}
 		break;
+
+	case CAM_SENSOR_PACKET_OPCODE_SENSOR_REGULATOR_ON:
+	case CAM_SENSOR_PACKET_OPCODE_SENSOR_REGULATOR_OFF:
+	case CAM_SENSOR_PACKET_OPCODE_AON_PARTIAL_BRIDGE_ENABLE:
+	case CAM_SENSOR_PACKET_OPCODE_AON_PARTIAL_BRIDGE_DISABLE:
+		CAM_DBG(CAM_SENSOR, "%s: opcode %d handled in pkt_parse",
+			s_ctrl->sensor_name, cmd->op_code);
+		break;
 	default:
 		CAM_ERR(CAM_SENSOR, "%s: Invalid Opcode: %d",
 			s_ctrl->sensor_name, cmd->op_code);
@@ -1744,9 +1893,267 @@ int cam_sensor_power(struct v4l2_subdev *sd, int on)
 	return 0;
 }
 
+static bool cam_sensor_is_regulator_seq(enum msm_camera_power_seq_type seq_type)
+{
+	switch (seq_type) {
+	case SENSOR_VANA:
+	case SENSOR_VDIG:
+	case SENSOR_VIO:
+	case SENSOR_VAF:
+	case SENSOR_CUSTOM_REG1:
+	case SENSOR_CUSTOM_REG2:
+	case SENSOR_VANA1:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static int cam_sensor_copy_regulator_settings(
+	struct cam_sensor_power_setting *src_settings,
+	uint16_t src_size,
+	struct cam_sensor_power_setting **dst_settings,
+	uint16_t *dst_size)
+{
+	uint16_t i, count = 0;
+	struct cam_sensor_power_setting *settings;
+
+	if (!src_settings || !dst_settings || !dst_size)
+		return -EINVAL;
+
+	for (i = 0; i < src_size; i++) {
+		if (cam_sensor_is_regulator_seq(src_settings[i].seq_type))
+			count++;
+	}
+
+	if (!count)
+		return -EINVAL;
+
+	settings = kcalloc(count, sizeof(*settings), GFP_KERNEL);
+	if (!settings)
+		return -ENOMEM;
+
+	count = 0;
+	for (i = 0; i < src_size; i++) {
+		if (cam_sensor_is_regulator_seq(src_settings[i].seq_type))
+			settings[count++] = src_settings[i];
+	}
+
+	*dst_settings = settings;
+	*dst_size = count;
+
+	return 0;
+}
+
+static int cam_sensor_aon_regulator_enable(
+	struct cam_sensor_power_ctrl_t *ctrl,
+	struct cam_hw_soc_info *soc_info)
+{
+	int rc = 0, index, vreg_idx;
+	uint32_t seq_min_volt, seq_max_volt;
+	struct cam_sensor_power_setting *power_setting;
+
+	if (!ctrl || !soc_info)
+		return -EINVAL;
+
+	if (!soc_info->num_rgltr ||
+		soc_info->num_rgltr > CAM_SOC_MAX_REGULATOR) {
+		CAM_ERR(CAM_SENSOR, "failed: num_rgltr %u",
+			(unsigned int)soc_info->num_rgltr);
+		return -EINVAL;
+	}
+
+	for (index = 0; index < ctrl->power_setting_size; index++) {
+		power_setting = &ctrl->power_setting[index];
+
+		if (power_setting->seq_val == INVALID_VREG)
+			continue;
+
+		if (power_setting->seq_val >= soc_info->num_rgltr) {
+			CAM_ERR(CAM_SENSOR, "invalid vreg index %u num_rgltr %u",
+				(unsigned int)power_setting->seq_val,
+				(unsigned int)soc_info->num_rgltr);
+			rc = -EINVAL;
+			goto rollback;
+		}
+
+		vreg_idx = power_setting->seq_val;
+		if (IS_ERR_OR_NULL(soc_info->rgltr[vreg_idx])) {
+			rc = PTR_ERR(soc_info->rgltr[vreg_idx]);
+			rc = rc ? rc : -EINVAL;
+			CAM_ERR(CAM_SENSOR, "%s get failed %d",
+				soc_info->rgltr_name[vreg_idx], rc);
+			goto rollback;
+		}
+
+		if (power_setting->valid_config) {
+			seq_min_volt = power_setting->config_val;
+			seq_max_volt = power_setting->config_val;
+		} else {
+			seq_min_volt = soc_info->rgltr_min_volt[vreg_idx];
+			seq_max_volt = soc_info->rgltr_max_volt[vreg_idx];
+		}
+
+		rc = cam_soc_util_regulator_enable(
+			soc_info->rgltr[vreg_idx],
+			soc_info->rgltr_name[vreg_idx],
+			seq_min_volt,
+			seq_max_volt,
+			soc_info->rgltr_op_mode[vreg_idx],
+			soc_info->rgltr_delay[vreg_idx]);
+		if (rc) {
+			CAM_ERR(CAM_SENSOR, "Reg Enable failed for %s",
+				soc_info->rgltr_name[vreg_idx]);
+			goto rollback;
+		}
+
+		power_setting->data[0] = soc_info->rgltr[vreg_idx];
+
+		if (power_setting->delay > 20)
+			msleep(power_setting->delay);
+		else if (power_setting->delay)
+			usleep_range(power_setting->delay * 1000,
+				(power_setting->delay * 1000) + 1000);
+	}
+
+	return 0;
+
+rollback:
+	for (index--; index >= 0; index--) {
+		power_setting = &ctrl->power_setting[index];
+
+		if (power_setting->seq_val == INVALID_VREG ||
+			power_setting->seq_val >= soc_info->num_rgltr ||
+			!power_setting->data[0])
+			continue;
+
+		vreg_idx = power_setting->seq_val;
+		cam_soc_util_regulator_disable(
+			soc_info->rgltr[vreg_idx],
+			soc_info->rgltr_name[vreg_idx],
+			soc_info->rgltr_min_volt[vreg_idx],
+			soc_info->rgltr_max_volt[vreg_idx],
+			soc_info->rgltr_op_mode[vreg_idx],
+			soc_info->rgltr_delay[vreg_idx]);
+		power_setting->data[0] = NULL;
+	}
+
+	return rc;
+}
+
+int cam_sensor_aon_regulator_on(struct cam_sensor_ctrl_t *s_ctrl,
+	struct cam_packet *csl_packet,
+	struct cam_cmd_buf_desc *cmd_desc,
+	struct cam_buf_io_cfg *io_cfg)
+{
+	int rc = 0;
+	struct cam_sensor_power_ctrl_t tmp_power_ctrl = {};
+	struct cam_sensor_power_ctrl_t *power_info;
+	struct cam_hw_soc_info *soc_info;
+
+	if (!s_ctrl || !csl_packet) {
+		CAM_ERR(CAM_SENSOR, "Invalid args");
+		return -EINVAL;
+	}
+
+	soc_info = &s_ctrl->soc_info;
+
+	if (s_ctrl->hw_no_ops) {
+		CAM_DBG(CAM_SENSOR, "%s: hw_no_ops set, skipping regulator on",
+			s_ctrl->sensor_name);
+		return 0;
+	}
+
+	power_info = &s_ctrl->sensordata->power_info;
+	rc = cam_sensor_copy_regulator_settings(power_info->power_setting,
+		power_info->power_setting_size, &tmp_power_ctrl.power_setting,
+		&tmp_power_ctrl.power_setting_size);
+	if (rc < 0) {
+		CAM_ERR(CAM_SENSOR,
+			"%s: failed to copy regulator-on settings rc=%d",
+			s_ctrl->sensor_name, rc);
+		return rc;
+	}
+
+	rc = msm_camera_fill_vreg_params(soc_info,
+		tmp_power_ctrl.power_setting,
+		tmp_power_ctrl.power_setting_size);
+	if (rc < 0) {
+		CAM_ERR(CAM_SENSOR, "%s: fill_vreg_params failed rc=%d",
+			s_ctrl->sensor_name, rc);
+		goto free_settings;
+	}
+
+	rc = cam_sensor_aon_regulator_enable(&tmp_power_ctrl, soc_info);
+	if (rc < 0)
+		CAM_ERR(CAM_SENSOR, "%s: regulator enable failed rc=%d",
+			s_ctrl->sensor_name, rc);
+
+free_settings:
+	kfree(tmp_power_ctrl.power_setting);
+	kfree(tmp_power_ctrl.power_down_setting);
+	return rc;
+}
+
+int cam_sensor_aon_regulator_off(struct cam_sensor_ctrl_t *s_ctrl,
+	struct cam_packet *csl_packet,
+	struct cam_cmd_buf_desc *cmd_desc,
+	struct cam_buf_io_cfg *io_cfg)
+{
+	int rc = 0;
+	struct cam_sensor_power_ctrl_t tmp_power_ctrl = {};
+	struct cam_sensor_power_ctrl_t *power_info;
+	struct cam_hw_soc_info *soc_info;
+
+	if (!s_ctrl || !csl_packet) {
+		CAM_ERR(CAM_SENSOR, "Invalid args");
+		return -EINVAL;
+	}
+
+	soc_info = &s_ctrl->soc_info;
+
+	if (s_ctrl->hw_no_ops) {
+		CAM_DBG(CAM_SENSOR, "%s: hw_no_ops set, skipping regulator off",
+			s_ctrl->sensor_name);
+		return 0;
+	}
+
+	power_info = &s_ctrl->sensordata->power_info;
+	rc = cam_sensor_copy_regulator_settings(power_info->power_down_setting,
+		power_info->power_down_setting_size,
+		&tmp_power_ctrl.power_down_setting,
+		&tmp_power_ctrl.power_down_setting_size);
+	if (rc < 0) {
+		CAM_ERR(CAM_SENSOR,
+			"%s: failed to copy regulator-off settings rc=%d",
+			s_ctrl->sensor_name, rc);
+		return rc;
+	}
+
+	rc = msm_camera_fill_vreg_params(soc_info,
+		tmp_power_ctrl.power_down_setting,
+		tmp_power_ctrl.power_down_setting_size);
+	if (rc < 0) {
+		CAM_ERR(CAM_SENSOR, "%s: fill_vreg_params failed rc=%d",
+			s_ctrl->sensor_name, rc);
+		goto free_settings;
+	}
+
+	rc = cam_sensor_util_power_down_regulators(&tmp_power_ctrl, soc_info);
+	if (rc < 0)
+		CAM_ERR(CAM_SENSOR, "%s: regulator power down failed rc=%d",
+			s_ctrl->sensor_name, rc);
+
+free_settings:
+	kfree(tmp_power_ctrl.power_setting);
+	kfree(tmp_power_ctrl.power_down_setting);
+	return rc;
+}
+
 int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int rc = 0;
+
 	struct cam_sensor_power_ctrl_t *power_info;
 	struct cam_camera_slave_info   *slave_info;
 	struct cam_hw_soc_info         *soc_info = &s_ctrl->soc_info;
