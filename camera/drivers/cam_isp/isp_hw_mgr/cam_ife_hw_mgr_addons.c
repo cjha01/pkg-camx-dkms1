@@ -393,12 +393,15 @@ int cam_ife_mgr_required_hw(void *hw_mgr_priv, bool stop)
 	for (i = 0; i < CAM_IFE_CTX_MAX; i++) {
 		if (ife_hw_mgr->virt_ctx_pool[i].ctx_in_use &&
 				ife_hw_mgr->virt_ctx_pool[i].is_offline &&
-				(!ife_hw_mgr->virt_ctx_pool[i].stop_done)) {
+				(ife_hw_mgr->virt_ctx_pool[i].stop_state !=
+				CAM_IFE_CTX_STOP_DONE)) {
 			current_bw = cam_ife_mgr_calc_bw(
 				&ife_hw_mgr->virt_ctx_pool[i].bw_data);
 			if (current_bw > max_bw)
 				max_bw = current_bw;
-			total_bw += current_bw;
+			if (ife_hw_mgr->virt_ctx_pool[i].stop_state !=
+				CAM_IFE_CTX_STOP_IN_PROGRESS)
+				total_bw += current_bw;
 			cnt++;
 		}
 	}

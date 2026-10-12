@@ -264,6 +264,12 @@ struct cam_ife_mgr_bw_data {
 	uint32_t framerate;
 };
 
+enum cam_ife_ctx_stop_state {
+	CAM_IFE_CTX_STOP_NONE,
+	CAM_IFE_CTX_STOP_IN_PROGRESS,
+	CAM_IFE_CTX_STOP_DONE,
+};
+
 /* struct cam_ife_hw_mgr_ctx - IFE HW manager Context object
  *
  * concr_ctx:             HW Context currently used from this manager context
@@ -277,7 +283,7 @@ struct cam_ife_mgr_bw_data {
  * in_ports:              context input ports
  * unpacker_fmt:          IFE input unpacker for offline isp
  * is_offline:            indicates if context is used for offline processing
- * stop_done:             indicates if HW stop done for Context
+ * stop_state:            indicates if stop is in progress or completed
  * @virtual_rdi_mapping_cb Callback query for virtual rdi mapping
  *
  */
@@ -293,7 +299,7 @@ struct cam_ife_hw_mgr_ctx {
 	struct cam_isp_in_port_generic_info    *in_ports;
 	uint32_t                                unpacker_fmt;
 	bool                                    is_offline;
-	bool                                    stop_done;
+	enum cam_ife_ctx_stop_state             stop_state;
 	cam_hw_get_virtual_rdi_mapping_cb_func  virtual_rdi_mapping_cb;
 };
 
