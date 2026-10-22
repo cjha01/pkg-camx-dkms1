@@ -366,6 +366,7 @@ static void cam_sensor_component_unbind(struct device *dev,
 	}
 
 	CAM_DBG(CAM_SENSOR, "Component unbind called for: %s", pdev->name);
+	cam_sensor_remove_device(s_ctrl);
 	mutex_lock(&(s_ctrl->cam_sensor_mutex));
 	cam_sensor_shutdown(s_ctrl);
 	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
@@ -405,6 +406,8 @@ int cam_sensor_i2c_driver_remove_common(struct i2c_client *client)
 		rc = -EINVAL;
 		return rc;
 	}
+
+	cam_sensor_remove_device(s_ctrl);
 
 	CAM_DBG(CAM_SENSOR, "i2c remove invoked");
 	mutex_lock(&(s_ctrl->cam_sensor_mutex));

@@ -22,9 +22,11 @@
 #include "ope_hw.h"
 #include "cam_cdm_intf_api.h"
 #include "cam_req_mgr_timer.h"
+#include "cam_cpas_api.h"
 
 #define OPE_CTX_MAX               32
 #define CAM_FRAME_CMD_MAX         20
+#define CAM_OPE_HW_MAX_NUM_PID    2
 
 
 #define OPE_WORKQ_NUM_TASK        100
@@ -493,7 +495,7 @@ struct cam_ope_ctx {
 struct cam_ope_hw_intf_data {
 	struct cam_hw_intf  *hw_intf;
 	uint32_t             num_hw_pid;
-	uint32_t             hw_pid[OPE_DEV_MAX];
+	uint32_t             hw_pid[CAM_OPE_HW_MAX_NUM_PID];
 };
 
 /**

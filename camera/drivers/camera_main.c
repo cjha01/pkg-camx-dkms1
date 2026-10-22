@@ -357,6 +357,12 @@ static const struct of_device_id camera_main_dt_match[] = {
 #if defined(CONFIG_X1E80100)
 	{.compatible = "qcom,camera_x1e80100"},
 #endif
+#if defined(CONFIG_SHIKRA)
+	{.compatible = "qcom,camera_shikra"},
+#endif
+#if defined(CONFIG_IQ10)
+	{.compatible = "qcom,camera_iq10"},
+#endif
 	{}
 };
 

@@ -15,7 +15,7 @@
 #include "cam_soc_bus.h"
 
 #define CAM_CPAS_INFLIGHT_WORKS              5
-#define CAM_CPAS_MAX_CLIENTS                 43
+#define CAM_CPAS_MAX_CLIENTS                 55
 #define CAM_CPAS_MAX_AXI_PORTS               6
 #define CAM_CPAS_MAX_DRV_PORTS               4
 #define CAM_CPAS_MAX_TREE_LEVELS             4
@@ -411,6 +411,7 @@ struct cam_cpas_monitor {
  * @smmu_fault_handled: Handled address decode error, on fault at SMMU
  * @force_hlos_drv: Whether to force disable DRV voting
  * @force_cesta_sw_client: Whether to force voting through cesta sw client
+ * @target_name: Target directory name for firmware lookup
  */
 struct cam_cpas {
 	struct cam_cpas_hw_caps hw_caps;
@@ -448,6 +449,7 @@ struct cam_cpas {
 	bool smmu_fault_handled;
 	bool force_hlos_drv;
 	bool force_cesta_sw_client;
+	const char *target_name;
 };
 
 int cam_camsstop_get_internal_ops(struct cam_cpas_internal_ops *internal_ops);

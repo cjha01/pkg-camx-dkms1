@@ -393,12 +393,15 @@ int cam_ife_mgr_required_hw(void *hw_mgr_priv, bool stop)
 	for (i = 0; i < CAM_IFE_CTX_MAX; i++) {
 		if (ife_hw_mgr->virt_ctx_pool[i].ctx_in_use &&
 				ife_hw_mgr->virt_ctx_pool[i].is_offline &&
-				(!ife_hw_mgr->virt_ctx_pool[i].stop_done)) {
+				(ife_hw_mgr->virt_ctx_pool[i].stop_state !=
+				CAM_IFE_CTX_STOP_DONE)) {
 			current_bw = cam_ife_mgr_calc_bw(
 				&ife_hw_mgr->virt_ctx_pool[i].bw_data);
 			if (current_bw > max_bw)
 				max_bw = current_bw;
-			total_bw += current_bw;
+			if (ife_hw_mgr->virt_ctx_pool[i].stop_state !=
+				CAM_IFE_CTX_STOP_IN_PROGRESS)
+				total_bw += current_bw;
 			cnt++;
 		}
 	}
@@ -461,6 +464,8 @@ static int cam_ife_mgr_get_rdi_stream_cfg_cnt(
 		case CAM_ISP_VIRTUAL_RDI3_PATH:
 		case CAM_ISP_VIRTUAL_RDI4_PATH:
 		case CAM_ISP_VIRTUAL_RDI5_PATH:
+		case CAM_ISP_VIRTUAL_RDI6_PATH:
+		case CAM_ISP_VIRTUAL_RDI7_PATH:
 			cnt++;
 			CAM_DBG(CAM_ISP, "path_id: %d",
 				sensor_grp_config->stream_grp_cfg[index].stream_cfg[i].path_id);
@@ -541,6 +546,8 @@ static int cam_ife_mgr_update_vc_dt_sensor_stream_cfg(
 	case CAM_ISP_VIRTUAL_RDI3_PATH:
 	case CAM_ISP_VIRTUAL_RDI4_PATH:
 	case CAM_ISP_VIRTUAL_RDI5_PATH:
+	case CAM_ISP_VIRTUAL_RDI6_PATH:
+	case CAM_ISP_VIRTUAL_RDI7_PATH:
 		for (j = 0; j < CAM_ISP_VC_DT_CFG; j++) {
 			if ((!grp_cfg->stream_cfg[stream_idx].rdi_vc[j]) &&
 				(!grp_cfg->stream_cfg[stream_idx].rdi_dt[j])) {
@@ -1066,6 +1073,24 @@ static int cam_ife_hw_mgr_update_res_virtual_mapping_table(
 		case CAM_IFE_PIX_PATH_RES_RDI_5:
 			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_5;
 			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_6:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_6;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_7:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_7;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_8:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_8;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_9:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_9;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_10:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_10;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_11:
+			vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_11;
+			break;
 		default:
 			CAM_ERR(CAM_ISP, "invalid resource type :%d",
 				hw_mgr_res->res_id);
@@ -1116,11 +1141,11 @@ static int cam_ife_hw_mgr_link_csid_pxl_resources(
 		}
 
 		if ((hw_mgr_res->res_id == path_res_id) &&
-			(!hw_mgr_res->linked)) {
+			(!hw_mgr_res->hw_res[0]->linked)) {
 			for (i = 0; i < in_port->num_valid_vc_dt; i++) {
 				if ((in_port->vc[i] == hw_mgr_res->vc) &&
 					(in_port->dt[i] == hw_mgr_res->dt)) {
-					hw_mgr_res->linked = true;
+					hw_mgr_res->hw_res[0]->linked = true;
 					per_port_feature_enable = true;
 					break;
 				}
@@ -1210,15 +1235,12 @@ static int cam_ife_hw_mgr_link_csid_rdi_resources(
 		list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_tmp,
 			&g_ife_sns_grp_cfg.grp_cfg[index]->res_ife_csid_list,
 			list) {
-			if (((hw_mgr_res->hw_res[0]->res_id >=
-				CAM_IFE_PIX_PATH_RES_RDI_0) &&
-				(hw_mgr_res->hw_res[0]->res_id <=
-				CAM_IFE_PIX_PATH_RES_RDI_5)) &&
-				(!hw_mgr_res->linked)) {
+			if (cam_ife_hw_mgr_is_csid_rdi_path(hw_mgr_res->hw_res[0]->res_id) &&
+				(!hw_mgr_res->hw_res[0]->linked)) {
 				for (j = 0; j < in_port->num_valid_vc_dt; j++) {
 					if ((in_port->vc[j] == hw_mgr_res->vc) &&
 						(in_port->dt[j] == hw_mgr_res->dt)) {
-						hw_mgr_res->linked = true;
+						hw_mgr_res->hw_res[0]->linked = true;
 						per_port_feature_enable = true;
 						CAM_DBG(CAM_ISP, "res_id: %d ctx:%d",
 							hw_mgr_res->hw_res[0]->res_id,
@@ -1359,6 +1381,8 @@ int cam_convert_res_id_to_hw_path(int res_id, int csid_res_id)
 			return CAM_ISP_PXL1_PATH;
 		else if (csid_res_id == CAM_IFE_PIX_PATH_RES_IPP_2)
 			return CAM_ISP_PXL2_PATH;
+		else if (csid_res_id == CAM_IFE_PIX_PATH_RES_IPP_3)
+			return CAM_ISP_PXL3_PATH;
 		else
 			return CAM_ISP_PXL_PATH;
 	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI0) {
@@ -1373,6 +1397,18 @@ int cam_convert_res_id_to_hw_path(int res_id, int csid_res_id)
 		return CAM_ISP_RDI4_PATH;
 	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI5) {
 		return CAM_ISP_RDI5_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI6) {
+		return CAM_ISP_RDI6_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI7) {
+		return CAM_ISP_RDI7_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI8) {
+		return CAM_ISP_RDI8_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI9) {
+		return CAM_ISP_RDI9_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI10) {
+		return CAM_ISP_RDI10_PATH;
+	} else if (res_id == CAM_ISP_HW_VFE_IN_RDI11) {
+		return CAM_ISP_RDI11_PATH;
 	}
 
 	return 0;
@@ -1455,6 +1491,24 @@ static int cam_ife_hw_mgr_link_ife_src_resources(
 		case CAM_IFE_PIX_PATH_RES_RDI_5:
 			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI5;
 			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_6:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI6;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_7:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI7;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_8:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI8;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_9:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI9;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_10:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI10;
+			break;
+		case CAM_IFE_PIX_PATH_RES_RDI_11:
+			vfe_acquire.vfe_in.res_id = CAM_ISP_HW_VFE_IN_RDI11;
+			break;
 		default:
 			CAM_ERR(CAM_ISP, "Wrong IFE CSID Path Resource ID : %d",
 				csid_res->res_id);
@@ -1464,8 +1518,8 @@ static int cam_ife_hw_mgr_link_ife_src_resources(
 		list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_tmp,
 			&g_ife_sns_grp_cfg.grp_cfg[index]->res_ife_src_list, list) {
 			if ((hw_mgr_res->res_id == vfe_acquire.vfe_in.res_id) &&
-				(!hw_mgr_res->linked)) {
-				hw_mgr_res->linked = true;
+				(!hw_mgr_res->hw_res[0]->linked)) {
+				hw_mgr_res->hw_res[0]->linked = true;
 				per_port_feature_enable = true;
 				break;
 			}
@@ -1593,6 +1647,24 @@ static int cam_ife_hw_mgr_link_res_ife_out_rdi(
 	case CAM_ISP_HW_VFE_IN_RDI5:
 		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_5;
 		break;
+	case CAM_ISP_HW_VFE_IN_RDI6:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_6;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI7:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_7;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI8:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_8;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI9:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_9;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI10:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_10;
+		break;
+	case CAM_ISP_HW_VFE_IN_RDI11:
+		vfe_out_res_id = CAM_ISP_IFE_OUT_RES_RDI_11;
+		break;
 	default:
 		CAM_ERR(CAM_ISP, "invalid resource type");
 		goto err;
@@ -1634,10 +1706,10 @@ static int cam_ife_hw_mgr_link_res_ife_out_rdi(
 
 	ife_out_res = &c_ctx->res_list_ife_out[c_ctx->num_acq_vfe_out];
 
-	if (ife_out_res_tmp->hw_res[0] == NULL || ife_out_res_tmp->linked) {
+	if (ife_out_res_tmp->hw_res[0] == NULL || ife_out_res_tmp->hw_res[0]->linked) {
 		CAM_ERR(CAM_ISP,
 			"no free ife_out RDI resource available ife_ctx: %d sensor_id: %d linked:%d",
-			c_ctx->ctx_index, c_ctx->sensor_id, ife_out_res_tmp->linked);
+			c_ctx->ctx_index, c_ctx->sensor_id, ife_out_res_tmp->hw_res[0]->linked);
 		rc = -ENODEV;
 		goto err;
 	}
@@ -1664,7 +1736,7 @@ static int cam_ife_hw_mgr_link_res_ife_out_rdi(
 
 	ife_out_res_tmp->res_id = out_port_res_type;
 	ife_out_res_tmp->res_type = CAM_ISP_RESOURCE_VFE_OUT;
-	ife_out_res_tmp->linked = true;
+	ife_out_res_tmp->hw_res[0]->linked = true;
 
 	if (out_port->secure_mode)
 		ife_out_res->is_secure = true;
@@ -1673,7 +1745,7 @@ static int cam_ife_hw_mgr_link_res_ife_out_rdi(
 	ife_out_res->use_wm_pack = ife_src_res->use_wm_pack;
 	ife_out_res->res_id = out_port_res_type;
 	ife_out_res->res_type = CAM_ISP_RESOURCE_VFE_OUT;
-	ife_out_res->linked = true;
+	ife_out_res->hw_res[0]->linked = true;
 
 	comp_index = vfe_acquire.vfe_out.comp_grp_id;
 	comp_grp = &c_ctx->vfe_bus_comp_grp[comp_index];
@@ -1723,7 +1795,7 @@ static int cam_ife_hw_mgr_link_res_ife_out_pixel(
 
 		ife_out_res = &c_ctx->res_list_ife_out[k];
 
-		if (ife_out_res_tmp->hw_res[0] == NULL || ife_out_res_tmp->linked) {
+		if (ife_out_res_tmp->hw_res[0] == NULL || ife_out_res_tmp->hw_res[0]->linked) {
 			CAM_ERR(CAM_ISP,
 				"no free ife_out res_type:0x%x resource available ife_ctx: %d sensor_id: %d",
 				out_port->res_type, c_ctx->ctx_index, c_ctx->sensor_id);
@@ -1758,7 +1830,7 @@ static int cam_ife_hw_mgr_link_res_ife_out_pixel(
 		ife_out_res_tmp->res_type = CAM_ISP_RESOURCE_VFE_OUT;
 		ife_out_res_tmp->is_dual_isp = in_port->usage_type;
 		ife_out_res_tmp->res_id = out_port->res_type;
-		ife_out_res_tmp->linked = true;
+		ife_out_res_tmp->hw_res[0]->linked = true;
 
 		ife_out_res->hw_res[0] = ife_out_res_tmp->hw_res[0];
 		ife_out_res->is_dual_isp = 0;
@@ -1766,7 +1838,7 @@ static int cam_ife_hw_mgr_link_res_ife_out_pixel(
 		ife_out_res->res_type = CAM_ISP_RESOURCE_VFE_OUT;
 		ife_out_res->is_dual_isp = in_port->usage_type;
 		ife_out_res->res_id = out_port->res_type;
-		ife_out_res->linked = true;
+		ife_out_res->hw_res[0]->linked = true;
 
 		ife_src_res->num_children++;
 		c_ctx->num_acq_vfe_out++;
@@ -1808,6 +1880,12 @@ static int cam_ife_hw_mgr_link_ife_out_resources(
 		case CAM_ISP_HW_VFE_IN_RDI3:
 		case CAM_ISP_HW_VFE_IN_RDI4:
 		case CAM_ISP_HW_VFE_IN_RDI5:
+		case CAM_ISP_HW_VFE_IN_RDI6:
+		case CAM_ISP_HW_VFE_IN_RDI7:
+		case CAM_ISP_HW_VFE_IN_RDI8:
+		case CAM_ISP_HW_VFE_IN_RDI9:
+		case CAM_ISP_HW_VFE_IN_RDI10:
+		case CAM_ISP_HW_VFE_IN_RDI11:
 			rc = cam_ife_hw_mgr_link_res_ife_out_rdi(ife_ctx,
 				ife_src_res, in_port, index);
 			break;
@@ -2384,6 +2462,80 @@ int cam_ife_mgr_hw_validate_vc_dt_stream_grp(
 	return rc;
 }
 
+static int cam_ife_hw_mgr_unlink_hw_res(
+	struct cam_ife_hw_mgr_ctx *ife_ctx, int index)
+{
+	uint32_t                                 i, k;
+	struct cam_isp_hw_mgr_res               *hw_mgr_res, *hw_mgr_res_g;
+	struct cam_isp_hw_mgr_res               *hw_mgr_res_temp, *hw_mgr_res_temp_g;
+	struct cam_isp_hw_mgr_res               *ife_out_res_tmp;
+	struct cam_ife_hw_concrete_ctx          *c_ctx = ife_ctx->concr_ctx;
+
+	CAM_DBG(CAM_ISP,
+		"Going to unlink hw res for ctx id:%d", c_ctx->ctx_index);
+
+	/* ife leaf resource */
+	for (i = 0; i < c_ctx->num_acq_vfe_out; i++) {
+		/* caller should make sure the resource is in a list */
+		hw_mgr_res = &c_ctx->res_list_ife_out[i];
+
+		if (!hw_mgr_res || !hw_mgr_res->hw_res[0])
+			continue;
+
+		k = hw_mgr_res->res_id & 0xFF;
+		ife_out_res_tmp = &g_ife_sns_grp_cfg.grp_cfg[index]->res_list_ife_out[k];
+		if ((ife_out_res_tmp->res_id == hw_mgr_res->res_id) &&
+			ife_out_res_tmp->hw_res[0] && ife_out_res_tmp->hw_res[0]->linked) {
+			ife_out_res_tmp->hw_res[0]->linked = false;
+			CAM_DBG(CAM_ISP, "Unlink ife_out res:%d ctx: %d sensor_id: %d",
+				hw_mgr_res->res_id, c_ctx->ctx_index, c_ctx->sensor_id);
+		}
+	}
+
+	/* ife source resource */
+	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
+		&c_ctx->res_list_ife_src, list) {
+		if (!hw_mgr_res || !hw_mgr_res->hw_res[0])
+			continue;
+		list_for_each_entry_safe(hw_mgr_res_g, hw_mgr_res_temp_g,
+			&g_ife_sns_grp_cfg.grp_cfg[index]->res_ife_src_list, list) {
+			if (!hw_mgr_res_g || !hw_mgr_res_g->hw_res[0])
+				continue;
+			if ((hw_mgr_res_g->res_id == hw_mgr_res->res_id) &&
+				hw_mgr_res_g->hw_res[0] && hw_mgr_res_g->hw_res[0]->linked) {
+				hw_mgr_res->hw_res[0]->linked = false;
+				hw_mgr_res_g->hw_res[0]->linked = false;
+				CAM_DBG(CAM_ISP, "Unlink ife_src res:%d ctx: %d sensor_id: %d",
+					hw_mgr_res->res_id, c_ctx->ctx_index, c_ctx->sensor_id);
+				break;
+			}
+		}
+	}
+
+	/* ife csid resource */
+	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
+		&c_ctx->res_list_ife_csid, list) {
+		if (!hw_mgr_res || !hw_mgr_res->hw_res[0])
+			continue;
+		list_for_each_entry_safe(hw_mgr_res_g, hw_mgr_res_temp_g,
+			&g_ife_sns_grp_cfg.grp_cfg[index]->res_ife_csid_list,
+			list) {
+			if (!hw_mgr_res_g || !hw_mgr_res_g->hw_res[0])
+				continue;
+			if ((hw_mgr_res_g->res_id == hw_mgr_res->res_id) &&
+				hw_mgr_res_g->hw_res[0] && hw_mgr_res_g->hw_res[0]->linked) {
+				hw_mgr_res->hw_res[0]->linked = false;
+				hw_mgr_res_g->hw_res[0]->linked = false;
+				CAM_DBG(CAM_ISP, "Unlink csid res:%d c_ctx: %d sensor_id: %d",
+					hw_mgr_res->res_id, c_ctx->ctx_index, c_ctx->sensor_id);
+				break;
+			}
+		}
+	}
+
+	return 0;
+}
+
 static int cam_ife_mgr_stop_hw_res_stream_grp(
 	struct cam_ife_hw_mgr_ctx           *ife_ctx,
 	int                        grp_cfg_index,
@@ -2568,6 +2720,9 @@ int cam_ife_hw_mgr_res_stream_on_off_grp_cfg(
 				grp_cfg->stream_on_cnt--;
 		}
 
+		/* Mark the hw resources in the group as unlinked */
+		cam_ife_hw_mgr_unlink_hw_res(ife_ctx, i);
+
 		/* Stop IFE out resources */
 		for (k = 0; k < c_ctx->num_acq_vfe_out; k++) {
 			hw_mgr_res = &c_ctx->res_list_ife_out[k];
@@ -2592,7 +2747,7 @@ int cam_ife_hw_mgr_start_ife_out_res_stream_grp(
 	int    grp_cfg_index,
 	struct cam_ife_hw_mgr_ctx           *ife_ctx)
 {
-	int rc;
+	int rc = 0;
 	struct cam_isp_hw_mgr_res           *hw_mgr_res;
 	uint32_t i;
 
@@ -2688,7 +2843,6 @@ int cam_ife_mgr_csid_start_hw_stream_grp(
 	}
 	return rc;
 }
-
 
 static int cam_ife_mgr_update_vfe_irq_mask(
 	struct cam_ife_hw_mgr_ctx           *ife_ctx,
@@ -2870,6 +3024,12 @@ int cam_ife_mgr_enable_irq(
 		case CAM_ISP_IFE_OUT_RES_RDI_3:
 		case CAM_ISP_IFE_OUT_RES_RDI_4:
 		case CAM_ISP_IFE_OUT_RES_RDI_5:
+		case CAM_ISP_IFE_OUT_RES_RDI_6:
+		case CAM_ISP_IFE_OUT_RES_RDI_7:
+		case CAM_ISP_IFE_OUT_RES_RDI_8:
+		case CAM_ISP_IFE_OUT_RES_RDI_9:
+		case CAM_ISP_IFE_OUT_RES_RDI_10:
+		case CAM_ISP_IFE_OUT_RES_RDI_11:
 			if (!res_rdi_context_set && cam_isp_is_ctx_primary_rdi(ife_ctx)) {
 				hw_mgr_res->hw_res[0]->is_rdi_primary_res =
 					cam_isp_is_ctx_primary_rdi(ife_ctx);
@@ -2999,7 +3159,7 @@ int cam_ife_hw_mgr_free_hw_ctx(
 
 		if (!hw_mgr_res->hw_res[0])
 			continue;
-		hw_mgr_res->linked = false;
+		hw_mgr_res->hw_res[0]->linked = false;
 		memset(hw_mgr_res, 0, sizeof(*hw_mgr_res));
 		c_ctx->num_acq_vfe_out--;
 	}
@@ -3007,7 +3167,9 @@ int cam_ife_hw_mgr_free_hw_ctx(
 	/* fetch rd resource */
 	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
 		&c_ctx->res_list_ife_in_rd, list) {
-		hw_mgr_res->linked = false;
+		if (hw_mgr_res->hw_res[0])
+			hw_mgr_res->hw_res[0]->linked = false;
+
 		list_del_init(&hw_mgr_res->list);
 		memset(hw_mgr_res, 0, sizeof(*hw_mgr_res));
 		INIT_LIST_HEAD(&hw_mgr_res->list);
@@ -3018,7 +3180,9 @@ int cam_ife_hw_mgr_free_hw_ctx(
 	/* ife source resource */
 	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
 		&c_ctx->res_list_ife_src, list) {
-		hw_mgr_res->linked = false;
+		if (hw_mgr_res->hw_res[0])
+			hw_mgr_res->hw_res[0]->linked = false;
+
 		list_del_init(&hw_mgr_res->list);
 		memset(hw_mgr_res, 0, sizeof(*hw_mgr_res));
 		INIT_LIST_HEAD(&hw_mgr_res->list);
@@ -3029,7 +3193,9 @@ int cam_ife_hw_mgr_free_hw_ctx(
 	/* ife csid resource */
 	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
 		&c_ctx->res_list_ife_csid, list) {
-		hw_mgr_res->linked = false;
+		if (hw_mgr_res->hw_res[0])
+			hw_mgr_res->hw_res[0]->linked = false;
+
 		list_del_init(&hw_mgr_res->list);
 		memset(hw_mgr_res, 0, sizeof(*hw_mgr_res));
 		INIT_LIST_HEAD(&hw_mgr_res->list);

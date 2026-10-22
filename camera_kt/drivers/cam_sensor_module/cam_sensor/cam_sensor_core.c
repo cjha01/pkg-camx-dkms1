@@ -489,6 +489,24 @@ static int32_t cam_sensor_i2c_modes_util(
 		rc = cam_sensor_i2c_read_data(
 			&s_ctrl->i2c_data.read_settings,
 			&s_ctrl->io_master_info);
+	} else if (i2c_list->op_code == CAM_SENSOR_I2C_READ_APPEND_WRITE) {
+		CAM_DBG(CAM_SENSOR, "Captured READ_APPEND_WRITE OPCODE");
+		rc = camera_io_dev_read_append_write(io_master_info,
+			&(i2c_list->i2c_settings));
+		if (rc < 0) {
+			CAM_ERR(CAM_SENSOR,
+				"i2c Read_append_write settings Failed: %d", rc);
+			return rc;
+		}
+	} else if ((i2c_list->op_code == CAM_SENSOR_I2C_SEQUENTIAL_XFER_LOCK) ||
+			(i2c_list->op_code == CAM_SENSOR_I2C_SEQUENTIAL_XFER_UNLOCK)) {
+		rc = camera_io_dev_sequential_xfer(io_master_info,
+			&(i2c_list->seq_xfer));
+		if (rc < 0) {
+			CAM_ERR(CAM_SENSOR,
+					"i2c Sequential Xfer settings Failed: %d", rc);
+			return rc;
+		}
 	}
 
 	return rc;
@@ -725,6 +743,19 @@ static void cam_sensor_query_cap(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->soc_info.index;
 }
 
+static void cam_sensor_query_cap_v2(struct cam_sensor_ctrl_t *s_ctrl,
+	struct cam_sensor_query_cap_v2 *query_cap)
+{
+	int32_t i = 0;
+
+	cam_sensor_query_cap(s_ctrl, &query_cap->query_cap_v1);
+	for (i = 0; i < MAX_LDM_SUPPORTED; i++) {
+		query_cap->ldm_slot_id[i] =
+			(s_ctrl->sensordata->subdev_id[SUB_MODULE_LENS_DRIVER0 + i] != -1) ?
+			s_ctrl->sensordata->subdev_id[SUB_MODULE_LENS_DRIVER0 + i] : 0xFFFFFFFF;
+	}
+}
+
 static uint16_t cam_sensor_id_by_mask(struct cam_sensor_ctrl_t *s_ctrl,
 	uint32_t chipid)
 {
@@ -950,6 +981,10 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		 */
 		s_ctrl->is_probe_succeed = 1;
 		s_ctrl->sensor_state = CAM_SENSOR_INIT;
+		if (cam_sensor_add_device(s_ctrl) < 0) {
+			CAM_DBG(CAM_SENSOR, "Failed to create sysfs entry for Slot=%d",
+					s_ctrl->soc_info.index);
+		}
 	}
 		break;
 	case CAM_ACQUIRE_DEV: {
@@ -1083,6 +1118,18 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		cam_sensor_query_cap(s_ctrl, &sensor_cap);
 		if (copy_to_user(u64_to_user_ptr(cmd->handle),
 			&sensor_cap, sizeof(struct  cam_sensor_query_cap))) {
+			CAM_ERR(CAM_SENSOR, "Failed Copy to User");
+			rc = -EFAULT;
+			goto release_mutex;
+		}
+		break;
+	}
+	case CAM_QUERY_CAP_V2: {
+		struct cam_sensor_query_cap_v2 sensor_cap_v2;
+
+		cam_sensor_query_cap_v2(s_ctrl, &sensor_cap_v2);
+		if (copy_to_user(u64_to_user_ptr(cmd->handle),
+			&sensor_cap_v2, sizeof(struct cam_sensor_query_cap_v2))) {
 			CAM_ERR(CAM_SENSOR, "Failed Copy to User");
 			rc = -EFAULT;
 			goto release_mutex;
@@ -1360,6 +1407,11 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 		return -EINVAL;
 	}
 
+	if (cam_sensor_pwr_ref_get(s_ctrl) > 1) {
+		CAM_ERR(CAM_SENSOR, "Sensor already powered up: refcount %d", s_ctrl->pwr_ref_cnt);
+		return 0;
+	}
+
 	soc_info = &s_ctrl->soc_info;
 
 	if (s_ctrl->bob_pwm_switch) {
@@ -1375,7 +1427,7 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 	rc = cam_sensor_core_power_up(power_info, soc_info);
 	if (rc < 0) {
 		CAM_ERR(CAM_SENSOR, "power up the core is failed:%d", rc);
-		return rc;
+		goto cci_ref_put;
 	}
 
 	rc = camera_io_init(&(s_ctrl->io_master_info));
@@ -1385,9 +1437,13 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 	}
 
 	return rc;
+
 cci_failure:
 	if (cam_sensor_util_power_down(power_info, soc_info))
 		CAM_ERR(CAM_SENSOR, "power down failure");
+
+cci_ref_put:
+	cam_sensor_pwr_ref_put(s_ctrl);
 
 	return rc;
 
@@ -1411,6 +1467,18 @@ int cam_sensor_power_down(struct cam_sensor_ctrl_t *s_ctrl)
 		CAM_ERR(CAM_SENSOR, "failed: power_info %pK", power_info);
 		return -EINVAL;
 	}
+
+	if (!cam_sensor_pwr_ref_read(s_ctrl)) {
+		CAM_ERR(CAM_SENSOR, "Sensor stop not expected: refcount %d", s_ctrl->pwr_ref_cnt);
+		return -EINVAL;
+	}
+
+	if (cam_sensor_pwr_ref_read(s_ctrl) > 1) {
+		CAM_ERR(CAM_SENSOR, "Sensor skip stop: refcount %d", s_ctrl->pwr_ref_cnt);
+		cam_sensor_pwr_ref_put(s_ctrl);
+		return 0;
+	}
+
 	rc = cam_sensor_util_power_down(power_info, soc_info);
 	if (rc < 0) {
 		CAM_ERR(CAM_SENSOR, "power down the core is failed:%d", rc);
@@ -1428,6 +1496,8 @@ int cam_sensor_power_down(struct cam_sensor_ctrl_t *s_ctrl)
 	}
 
 	camera_io_release(&(s_ctrl->io_master_info));
+
+	cam_sensor_pwr_ref_put(s_ctrl);
 
 	return rc;
 }

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_SUBDEV_H_
@@ -75,6 +75,35 @@ struct cam_subdev_msg_phy_halt_resume_info {
 	enum cam_subdev_phy_csid_state csid_state;
 };
 
+/**
+ * struct cam_subdev_msg_cdr_sweep_info: Contains all relevant info wrt
+ *                                       CSID register values needed as
+ *                                       part of CSIPHY CDR tuning
+ *
+ * @phy_idx:                 Phy idx value indicating which phy is connected to csid core
+ * @lane_cfg:                This value is similar to lane_assign in the PHY
+ *                           driver, and is used to identify the particular
+ *                           PHY instance with which this IFE session is
+ *                           connected to
+ * @csi2_rx_status:          Rx irq status register value
+ * @csi2_rx_status_2:        Rx irq status 2 register value
+ * @csi2_rx_total_crc_err:   Rx total crc err register value
+ * @csi2_rx_total_pkts_rcvd: Rx total pkts rcvd register value
+ * @csi2_err_seen:           If CSI RX has an error
+ * @epd_enabled:             If sensor streaming on this CSI is
+ *                           EPD enabled
+ */
+struct cam_subdev_msg_cdr_sweep_info {
+	uint32_t phy_idx;
+	uint32_t lane_cfg;
+	uint32_t csi2_rx_status;
+	uint32_t csi2_rx_status_2;
+	uint32_t csi2_rx_total_crc_err;
+	uint32_t csi2_rx_total_pkts_rcvd;
+	bool     csi2_err_seen;
+	bool     epd_enabled;
+};
+
 enum cam_subdev_message_type_t {
 	CAM_SUBDEV_MESSAGE_REG_DUMP = 0x1,
 	CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX,
@@ -82,7 +111,8 @@ enum cam_subdev_message_type_t {
 	CAM_SUBDEV_MESSAGE_CONN_CSID_INFO,
 	CAM_SUBDEV_MESSAGE_DRV_INFO,
 	CAM_SUBDEV_MESSAGE_NOTIFY_HALT_RESUME,
-	CAM_SUBDEV_MESSAGE_CLOCK_UPDATE
+	CAM_SUBDEV_MESSAGE_CLOCK_UPDATE,
+	CAM_SUBDEV_MESSAGE_CDR_SWEEP
 };
 
 /* Enum for close sequence priority */

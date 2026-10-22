@@ -67,6 +67,7 @@ enum cam_debug_module_id {
 	CAM_DMA_FENCE,           /* bit 35 */
 	CAM_SENSOR_UTIL,         /* bit 36 */
 	CAM_SYNX,                /* bit 37 */
+	CAM_LENS_DRIVER,         /* bit 38 */
 	CAM_DBG_MOD_MAX
 };
 

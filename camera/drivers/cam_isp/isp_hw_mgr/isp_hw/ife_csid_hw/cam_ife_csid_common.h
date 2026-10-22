@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_IFE_CSID_COMMON_H_
@@ -120,7 +120,80 @@ enum cam_ife_csid_irq_reg {
 	CAM_IFE_CSID_IRQ_REG_RX_2,
 	CAM_IFE_CSID_IRQ_REG_IPP_1,
 	CAM_IFE_CSID_IRQ_REG_IPP_2,
+	CAM_IFE_CSID_IRQ_REG_IPP_3,
+	CAM_IFE_CSID_IRQ_REG_RDI_6,
+	CAM_IFE_CSID_IRQ_REG_RDI_7,
+	CAM_IFE_CSID_IRQ_REG_RDI_8,
+	CAM_IFE_CSID_IRQ_REG_RDI_9,
+	CAM_IFE_CSID_IRQ_REG_RDI_10,
+	CAM_IFE_CSID_IRQ_REG_RDI_11,
 	CAM_IFE_CSID_IRQ_REG_MAX,
+};
+
+/**
+ * enum cam_ife_csid_hw_top_events - Specify the top irq events
+ */
+enum cam_ife_csid_hw_top_events {
+	CAM_IFE_CSID_TOP_INFO_VOTE_UP,
+	CAM_IFE_CSID_TOP_INFO_VOTE_DN,
+	CAM_IFE_CSID_TOP_ERR_NO_VOTE_DN,
+	CAM_IFE_CSID_TOP_ERR_VOTE_UP_LATE,
+	CAM_IFE_CSID_TOP_ERR_RDI_LINE_BUFFER_CONFLICT,
+	CAM_IFE_CSID_TOP_ERR_SENSOR_HBI,
+	CAM_IFE_CSID_TOP_REG_IRQ_EVENTS_MAX,
+};
+
+/**
+ * enum cam_ife_csid_hw_rx_events - Specify the rx irq events
+ */
+enum cam_ife_csid_hw_rx_events {
+	CAM_IFE_CSID_RX_DL0_EOT_CAPTURED,
+	CAM_IFE_CSID_RX_DL1_EOT_CAPTURED,
+	CAM_IFE_CSID_RX_DL2_EOT_CAPTURED,
+	CAM_IFE_CSID_RX_DL3_EOT_CAPTURED,
+	CAM_IFE_CSID_RX_DL0_SOT_CAPTURED,
+	CAM_IFE_CSID_RX_DL1_SOT_CAPTURED,
+	CAM_IFE_CSID_RX_DL2_SOT_CAPTURED,
+	CAM_IFE_CSID_RX_DL3_SOT_CAPTURED,
+	CAM_IFE_CSID_RX_LONG_PKT_CAPTURED,
+	CAM_IFE_CSID_RX_SHORT_PKT_CAPTURED,
+	CAM_IFE_CSID_RX_CPHY_PKT_HDR_CAPTURED,
+	CAM_IFE_CSID_RX_CPHY_EOT_RECEPTION,
+	CAM_IFE_CSID_RX_CPHY_SOT_RECEPTION,
+	CAM_IFE_CSID_RX_ERROR_CPHY_PH_CRC,
+	CAM_IFE_CSID_RX_WARNING_ECC,
+	CAM_IFE_CSID_RX_LANE0_FIFO_OVERFLOW,
+	CAM_IFE_CSID_RX_LANE1_FIFO_OVERFLOW,
+	CAM_IFE_CSID_RX_LANE2_FIFO_OVERFLOW,
+	CAM_IFE_CSID_RX_LANE3_FIFO_OVERFLOW,
+	CAM_IFE_CSID_RX_ERROR_CRC,
+	CAM_IFE_CSID_RX_ERROR_ECC,
+	CAM_IFE_CSID_RX_MMAPPED_VC_DT,
+	CAM_IFE_CSID_RX_UNMAPPED_VC_DT,
+	CAM_IFE_CSID_RX_STREAM_UNDERFLOW,
+	CAM_IFE_CSID_RX_UNBOUNDED_FRAME,
+	CAM_IFE_CSID_RX_ERROR_ILLEGAL_PROGRAMMING,
+	CAM_IFE_CSID_RX_INFO_SENSOR_MODE_ID_CHANGE,
+	CAM_IFE_CSID_RX_RX2_IRQ,
+	CAM_IFE_CSID_RX_DL0_EOT_LOST,
+	CAM_IFE_CSID_RX_DL1_EOT_LOST,
+	CAM_IFE_CSID_RX_DL2_EOT_LOST,
+	CAM_IFE_CSID_RX_DL3_EOT_LOST,
+	CAM_IFE_CSID_RX_DL0_SOT_LOST,
+	CAM_IFE_CSID_RX_DL1_SOT_LOST,
+	CAM_IFE_CSID_RX_DL2_SOT_LOST,
+	CAM_IFE_CSID_RX_DL3_SOT_LOST,
+	CAM_IFE_CSID_RX_REG_IRQ_EVENTS_MAX,
+};
+
+struct cam_ife_csid_top_debug_mask {
+	uint64_t evt_bitmap[CAM_IFE_CSID_TOP_IRQ_STATUS_REG_MAX];
+	uint8_t bit_pos[CAM_IFE_CSID_TOP_REG_IRQ_EVENTS_MAX];
+};
+
+struct cam_ife_csid_rx_debug_mask {
+	uint64_t evt_bitmap[CAM_IFE_CSID_RX_IRQ_STATUS_REG_MAX];
+	uint8_t bit_pos[CAM_IFE_CSID_RX_REG_IRQ_EVENTS_MAX];
 };
 
 /*
@@ -311,16 +384,17 @@ struct cam_ife_csid_hw_counters {
 /*
  * struct cam_ife_csid_debug_info: place holder for csid debug
  *
- * @debug_val:             Debug val for enabled features
- * @rx_capture_vc:         rx packet vc capture
- * @rx_capture_dt:         rx packet dt capture
- * @rst_capture_strobes:   rx packet capture rst strobes
- * @top_mask:              Debug mask for top irq
- * @rx_mask:               Debug mask for rx irq
- * @path_mask:             Debug mask for path irq
- * @test_bus_val:          CSID test bus value
- * @rx_capture_debug_set:  rx pkt capture debug set
- * @test_bus_enabled:      test bus enabled
+ * @debug_val:               Debug val for enabled features
+ * @rx_capture_vc:           rx packet vc capture
+ * @rx_capture_dt:           rx packet dt capture
+ * @rst_capture_strobes:     rx packet capture rst strobes
+ * @top_mask:                Debug mask for top irq
+ * @rx_mask:                 Debug mask for rx irq
+ * @path_mask:               Debug mask for path irq
+ * @test_bus_val:            CSID test bus value
+ * @rx_capture_debug_set:    rx pkt capture debug set
+ * @test_bus_enabled:        test bus enabled
+ * @enable_cdr_sweep_debug:  If CDR sweep for CSIPHY is enabled
  */
 struct cam_ife_csid_debug_info {
 	uint32_t                          debug_val;
@@ -333,6 +407,7 @@ struct cam_ife_csid_debug_info {
 	uint32_t                          test_bus_val;
 	bool                              rx_capture_debug_set;
 	bool                              test_bus_enabled;
+	bool                              cdr_sweep_debug_enabled;
 };
 
 /*
@@ -367,6 +442,7 @@ struct cam_ife_csid_hw_flags {
 	bool                  sfe_en;
 	bool                  pf_err_detected;
 	bool                  domain_id_security;
+	bool                  per_port_en;
 };
 
 /*

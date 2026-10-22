@@ -18,6 +18,7 @@
 #include <linux/debugfs.h>
 #include <linux/platform_device.h>
 #include <linux/semaphore.h>
+#include <linux/wait.h>
 #include <media/cam_sensor.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ioctl.h>
@@ -84,6 +85,9 @@ enum cam_cci_cmd_type {
 	MSM_CCI_GPIO_WRITE,
 	MSM_CCI_I2C_WRITE_SYNC,
 	MSM_CCI_I2C_WRITE_SYNC_BLOCK,
+	MSM_CCI_I2C_READ_APPEND_WRITE,
+	MSM_CCI_I2C_SEQUENTIAL_XFER_LOCK,
+	MSM_CCI_I2C_SEQUENTIAL_XFER_UNLOCK
 };
 
 enum cci_i2c_queue_t {
@@ -136,6 +140,11 @@ struct cam_cci_master_info {
 	spinlock_t freq_cnt_lock;
 	uint16_t freq_ref_cnt;
 	bool is_initilized;
+	struct mutex master_lock_mutex;
+	bool is_master_locked;
+	bool is_read_append_locked;
+	wait_queue_head_t lock_wait;
+	uint16_t master_usage_cnt;
 };
 
 struct cam_cci_clk_params_t {
@@ -156,6 +165,16 @@ enum cam_cci_state_t {
 	CCI_STATE_ENABLED,
 	CCI_STATE_DISABLED,
 };
+
+#ifdef CONFIG_SPECTRA_SENSOR_SYSFS_UTIL
+struct cci_sysfs {
+	int32_t master;
+	int32_t cci_dev;
+	struct kobject sysfs_kobj;
+	struct mutex cci_mutex;
+	char *display_buf;
+};
+#endif /* CONFIG_SPECTRA_SENSOR_SYSFS_UTIL */
 
 /**
  * struct cci_device
@@ -227,6 +246,10 @@ struct cci_device {
 	uint32_t irqs_disabled;
 	struct mutex init_mutex;
 	uint64_t  dump_en;
+#ifdef CONFIG_SPECTRA_SENSOR_SYSFS_UTIL
+	struct cci_sysfs cci_master_sysfs[MASTER_MAX];
+	int32_t num_masters;
+#endif /* CONFIG_SPECTRA_SENSOR_SYSFS_UTIL */
 };
 
 enum cam_cci_i2c_cmd_type {
@@ -273,6 +296,7 @@ struct cam_sensor_cci_client {
 	uint16_t retries;
 	uint16_t id_map;
 	uint16_t cci_device;
+	bool is_master_owned;
 };
 
 struct cam_cci_ctrl {
@@ -301,6 +325,26 @@ irqreturn_t cam_cci_irq(int irq_num, void *data);
 struct v4l2_subdev *cam_cci_get_subdev(int cci_dev_index);
 void cam_cci_dump_registers(struct cci_device *cci_dev,
 		enum cci_i2c_master_t master, enum cci_i2c_queue_t queue);
+
+#ifdef CONFIG_SPECTRA_SENSOR_SYSFS_UTIL
+/**
+ * @brief       : API to update client bus information.
+ * @bus_id      : cci bus id, this is basically cci cel index
+ * @cci_dev     : cci device handle
+ * @master_id   : master id of the client
+ */
+int32_t cam_cci_get_bus_info(int32_t bus_id, int32_t cci_idx,
+	int32_t *cci_dev, int32_t *master_id);
+
+#else
+
+static inline int32_t cam_cci_get_bus_info(int32_t bus_id, int32_t cci_idx,
+	int32_t *cci_dev, int32_t *master_id)
+{
+	return 0;
+}
+
+#endif /* CONFIG_SPECTRA_SENSOR_SYSFS_UTIL */
 
 /**
  * @brief : API to register CCI hw to platform framework.

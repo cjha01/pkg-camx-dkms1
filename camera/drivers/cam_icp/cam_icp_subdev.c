@@ -52,7 +52,15 @@ struct cam_icp_subdev {
 	int32_t reserved;
 };
 
-struct camera_firmware cam_fw;
+/*
+ * One camera_firmware instance per ICP device index, so the two ICP
+ * subdev instances (device_idx 0/1) do not clobber each other's
+ * FW dev/IOMMU-domain state. This is a static array, not embedded in
+ * struct cam_icp_subdev, because the ICP HW core's component bind
+ * (cam_icp_v2_component_bind) captures a pointer to it before the
+ * logical cam_icp_subdev for the same device_idx is allocated.
+ */
+static struct camera_firmware g_cam_fw[CAM_ICP_SUBDEV_MAX];
 static DEFINE_MUTEX(g_dev_lock);
 static struct cam_icp_subdev *g_icp_dev[CAM_ICP_SUBDEV_MAX];
 
@@ -192,8 +200,7 @@ static int cam_icp_subdev_close_internal(struct v4l2_subdev *sd,
 	if (!node) {
 		CAM_ERR(CAM_ICP, "device[%s] Invalid params: node is NULL",
 			sd->name);
-		rc = -EINVAL;
-		goto end;
+		return -EINVAL;
 	}
 
 	if (CAM_ICP_IS_DEV_IDX_INVALID(node->device_idx)) {
@@ -258,6 +265,14 @@ static inline int cam_icp_subdev_clean_up(uint32_t device_idx)
 	g_icp_dev[device_idx] = NULL;
 
 	return 0;
+}
+
+struct camera_firmware *cam_icp_subdev_get_fw(uint32_t device_idx)
+{
+	if (CAM_ICP_IS_DEV_IDX_INVALID(device_idx))
+		return NULL;
+
+	return &g_cam_fw[device_idx];
 }
 
 static void cam_put_domain_for_fw(struct camera_firmware *fw)
@@ -442,7 +457,7 @@ static int cam_icp_component_bind(struct device *dev,
 		goto ctx_fail;
 	}
 
-	rc = cam_get_domain_for_fw(dev, &cam_fw);
+	rc = cam_get_domain_for_fw(dev, &g_cam_fw[device_idx]);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "device[%s] get domain for fw failed: %d", subdev_name, rc);
 		goto ctx_fail;
@@ -467,7 +482,7 @@ static int cam_icp_component_bind(struct device *dev,
 	return rc;
 
 fw_cleanup:
-	cam_put_domain_for_fw(&cam_fw);
+	cam_put_domain_for_fw(&g_cam_fw[device_idx]);
 ctx_fail:
 	for (--i; i >= 0; i--)
 		cam_icp_context_deinit(&icp_dev->ctx_icp[i]);
@@ -521,6 +536,7 @@ static void cam_icp_component_unbind(struct device *dev,
 	cam_unregister_subdev(&icp_dev->sd);
 	cam_subdev_remove(&icp_dev->sd);
 	mutex_destroy(&icp_dev->icp_lock);
+	cam_put_domain_for_fw(&g_cam_fw[device_idx]);
 	cam_icp_subdev_clean_up(device_idx);
 
 	CAM_DBG(CAM_ICP, "device[%s] component unbinded successfully", pdev->name);
