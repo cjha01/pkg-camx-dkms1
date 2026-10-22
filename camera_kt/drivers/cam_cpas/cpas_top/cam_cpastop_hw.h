@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CPASTOP_HW_H_
@@ -366,6 +367,15 @@ struct cam_camnoc_info {
 	struct cam_camnoc_err_logger_info *err_logger;
 	struct cam_cpas_hw_errata_wa_list *errata_wa_list;
 	struct cam_camnoc_fifo_lvl_info *fill_lvl_register;
+};
+
+/**
+ * struct cam_cpas_info: CPAS information
+ *
+ * @target_name: Target directory name for firmware lookup
+ */
+struct cam_cpas_info {
+	const char *target_name;
 };
 
 /**

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_ICP_UTILS_H_
@@ -16,7 +16,6 @@
 #include "cam_icp_hw_mgr_intf.h"
 #include "cam_icp_soc_common.h"
 
-#define ICP_FW_NAME_MAX_SIZE    32
 #define PC_POLL_DELAY_US        100
 #define PC_POLL_TIMEOUT_US      10000
 

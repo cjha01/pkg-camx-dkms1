@@ -598,6 +598,7 @@ static void cam_vfe_top_ver4_print_ipp_violation_info(
 	struct cam_vfe_top_ver4_common_data *common_data;
 	void __iomem                        *base;
 	uint32_t                             val = 0;
+	uint32_t                             i = 0;
 
 	common_data = &top_priv->common_data;
 	soc_info    =  top_priv->top_common.soc_info;
@@ -614,6 +615,13 @@ static void cam_vfe_top_ver4_print_ipp_violation_info(
 			common_data->hw_info->ipp_module_desc[val].id,
 			common_data->hw_info->ipp_module_desc[val].desc);
 
+	for (i = 0; i < common_data->hw_info->num_ipp_violation_errors; i++) {
+		if (common_data->hw_info->ipp_violation_desc[i].bitmask & val) {
+			CAM_ERR(CAM_ISP, "VFE[%u] IPP Violation Module: %s",
+				soc_info->index,
+				common_data->hw_info->ipp_violation_desc[i].desc);
+		}
+	}
 }
 
 static void cam_vfe_top_ver4_print_top_irq_error(
@@ -2555,7 +2563,7 @@ int cam_vfe_top_ver4_init(
 	void                                   *vfe_irq_controller,
 	struct cam_vfe_top                    **vfe_top_ptr)
 {
-	int i, j, rc = 0;
+	int i, j = 0, rc = 0;
 	struct cam_vfe_top_ver4_priv           *top_priv = NULL;
 	struct cam_vfe_top_ver4_hw_info        *hw_info = top_hw_info;
 	struct cam_vfe_top                     *vfe_top;
@@ -2587,8 +2595,7 @@ int cam_vfe_top_ver4_init(
 
 	top_priv->top_common.num_mux = hw_info->num_mux;
 
-	for (i = 0, j = 0; i < top_priv->top_common.num_mux &&
-		j < hw_info->num_rdi; i++) {
+	for (i = 0; i < top_priv->top_common.num_mux; i++) {
 		top_priv->top_common.mux_rsrc[i].res_type =
 			CAM_ISP_RESOURCE_VFE_IN;
 		top_priv->top_common.mux_rsrc[i].hw_intf = hw_intf;
@@ -2621,7 +2628,7 @@ int cam_vfe_top_ver4_init(
 			scnprintf(top_priv->top_common.mux_rsrc[i].res_name,
 				CAM_ISP_RES_NAME_LEN, "PDLIB");
 		} else if (hw_info->mux_type[i] ==
-			CAM_VFE_RDI_VER_1_0) {
+			CAM_VFE_RDI_VER_1_0 && j < hw_info->num_rdi) {
 			/* set the RDI resource id */
 			top_priv->top_common.mux_rsrc[i].res_id =
 				CAM_ISP_HW_VFE_IN_RDI0 + j;

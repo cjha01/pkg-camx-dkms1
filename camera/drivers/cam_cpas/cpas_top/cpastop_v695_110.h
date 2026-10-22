@@ -992,5 +992,6 @@ static struct cam_cpas_info cam695_cpas110_cpas_info = {
 	},
 	.qchannel_info = {&cam695_cpas110_qchannel_info},
 	.num_qchannel = 1,
+	.target_name = "x1p42100",
 };
 #endif /* _CPASTOP_V695_110_H_ */

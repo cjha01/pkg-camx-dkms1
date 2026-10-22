@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CPAS_API_H_
@@ -639,6 +640,18 @@ int cam_cpas_get_hw_info(
  */
 int cam_cpas_get_cpas_hw_version(
 	uint32_t				 *hw_version);
+
+/**
+ * cam_cpas_get_target_name()
+ *
+ * @brief: API to get target name mapped for current cpas hw version
+ *
+ * @target_name : Target name string pointer
+ *
+ * @return 0 on success.
+ *
+ */
+int cam_cpas_get_target_name(const char **target_name);
 
 /**
  * cam_cpas_get_camnoc_fifo_fill_level_info()

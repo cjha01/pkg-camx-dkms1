@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CPASTOP_HW_H_
@@ -527,11 +527,13 @@ struct cam_cpas_camnoc_qchannel {
  * @qchannel_info: CPAS qchannel info
  * @hw_cap_info: CPAS Hardware capability information
  * @num_qchannel: Number of qchannel
+ * @target_name: Target directory name for firmware lookup
  */
 struct cam_cpas_info {
 	struct cam_cpas_camnoc_qchannel *qchannel_info[CAM_CAMNOC_HW_TYPE_MAX];
 	struct cam_cpas_hw_cap_info hw_caps_info;
 	uint8_t num_qchannel;
+	const char *target_name;
 };
 
 /**

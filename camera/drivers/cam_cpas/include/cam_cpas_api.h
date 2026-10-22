@@ -106,6 +106,7 @@ enum cam_cpas_camera_version {
 	CAM_CPAS_CAMERA_VERSION_665  = 0x00060605,
 	CAM_CPAS_CAMERA_VERSION_690  = 0x00060900,
 	CAM_CPAS_CAMERA_VERSION_692  = 0x00060902,
+	CAM_CPAS_CAMERA_VERSION_900  = 0x00090000,
 	CAM_CPAS_CAMERA_VERSION_695  = 0x00060905,
 	CAM_CPAS_CAMERA_VERSION_696  = 0x00060906,
 	CAM_CPAS_CAMERA_VERSION_MAX
@@ -153,6 +154,7 @@ enum cam_cpas_camera_version_map_id {
 	CAM_CPAS_CAMERA_VERSION_ID_692  = 0x13,
 	CAM_CPAS_CAMERA_VERSION_ID_695  = 0x14,
 	CAM_CPAS_CAMERA_VERSION_ID_696  = 0x15,
+	CAM_CPAS_CAMERA_VERSION_ID_900  = 0x16,
 	CAM_CPAS_CAMERA_VERSION_ID_MAX
 };
 
@@ -205,6 +207,8 @@ enum cam_cpas_hw_version {
 	CAM_CPAS_TITAN_665_V100 = 0x665100,
 	CAM_CPAS_TITAN_690_V100 = 0x690100,
 	CAM_CPAS_TITAN_692_V100 = 0x692100,
+	CAM_CPAS_TITAN_900_V100 = 0x900100,
+	CAM_CPAS_TITAN_900_V110 = 0x900110,
 	CAM_CPAS_TITAN_695_V100 = 0x695100,
 	CAM_CPAS_TITAN_695_V110 = 0x695110,
 	CAM_CPAS_TITAN_696_V100 = 0x696100,
@@ -822,6 +826,18 @@ int cam_cpas_get_hw_info(
  *
  */
 int cam_cpas_get_cpas_hw_version(uint32_t *hw_version);
+
+/**
+ * cam_cpas_get_target_name()
+ *
+ * @brief: API to get target name mapped for current cpas hw version
+ *
+ * @target_name : Target name string pointer
+ *
+ * @return 0 on success.
+ *
+ */
+int cam_cpas_get_target_name(const char **target_name);
 
 /**
  * cam_cpas_is_feature_supported()

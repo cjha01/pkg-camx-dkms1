@@ -12,6 +12,7 @@
 #include "cam_isp_packet_parser.h"
 #include "cam_debug_util.h"
 #include "cam_isp_hw_mgr_intf.h"
+#include "cam_ife_hw_mgr.h"
 
 int cam_isp_count_hw_entries(struct cam_hw_prepare_update_args *prepare)
 {
@@ -800,8 +801,7 @@ static int cam_isp_get_outport_res_id(
 	prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *)
 			prepare->priv;
 
-	if ((io_cfg->resource_type >= CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI0 &&
-		io_cfg->resource_type <= CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI5) &&
+	if (cam_ife_hw_mgr_is_virtual_rdi_out_res(io_cfg->resource_type) &&
 		prepare_hw_data->per_port_enable) {
 		if (prepare_hw_data->virtual_rdi_mapping_cb) {
 			out_port = prepare_hw_data->virtual_rdi_mapping_cb(priv,

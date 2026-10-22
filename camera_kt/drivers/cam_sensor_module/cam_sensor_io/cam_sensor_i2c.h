@@ -72,12 +72,13 @@ int32_t cam_cci_i2c_write_continuous_table(
 	uint8_t cam_sensor_i2c_write_flag);
 
 /**
- * @cci_client: CCI client structure
+ * @client: IO_Master client structure
  * @cci_cmd: CCI command type
  *
  * Does I2C call to I2C functionalities
  */
-int32_t cam_sensor_cci_i2c_util(struct cam_sensor_cci_client *cci_client,
+int32_t cam_sensor_cci_i2c_util(
+	struct camera_io_master *client,
 	uint16_t cci_cmd);
 
 /**
@@ -96,6 +97,20 @@ int32_t cam_cci_i2c_poll(struct cam_sensor_cci_client *client,
 	enum camera_sensor_i2c_type data_type,
 	enum camera_sensor_i2c_type addr_type,
 	uint32_t delay_ms);
+
+/**
+ * @client: CCI client structure
+ * @rd_append_write_setting: I2C reg settings
+ *
+ * This API implements CCI read append write
+ */
+int32_t cam_cci_i2c_read_append_write(
+	struct camera_io_master *client,
+	struct cam_sensor_i2c_reg_setting *rd_append_write_setting);
+
+int32_t cam_cci_i2c_sequential_xfer(
+	struct camera_io_master *io_master_info,
+	struct cam_cmd_i2c_sequential_xfer *seq_xfer);
 
 
 /**

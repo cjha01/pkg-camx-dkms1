@@ -11,7 +11,7 @@
 #include "cam_ife_csid_hw_intf.h"
 #include "cam_cpas_api.h"
 
-#define CAM_VFE_HW_NUM_MAX            8
+#define CAM_VFE_HW_NUM_MAX            16
 
 #define VFE_CORE_BASE_IDX             0
 #define RT_BASE_IDX                   2
@@ -36,8 +36,14 @@ enum cam_isp_hw_vfe_in_mux {
 	CAM_ISP_HW_VFE_IN_RDI3        = 6,
 	CAM_ISP_HW_VFE_IN_RDI4        = 7,
 	CAM_ISP_HW_VFE_IN_RDI5        = 8,
-	CAM_ISP_HW_VFE_IN_PDLIB       = 9,
-	CAM_ISP_HW_VFE_IN_LCR         = 10,
+	CAM_ISP_HW_VFE_IN_RDI6        = 9,
+	CAM_ISP_HW_VFE_IN_RDI7        = 10,
+	CAM_ISP_HW_VFE_IN_RDI8        = 11,
+	CAM_ISP_HW_VFE_IN_RDI9        = 12,
+	CAM_ISP_HW_VFE_IN_RDI10       = 13,
+	CAM_ISP_HW_VFE_IN_RDI11       = 14,
+	CAM_ISP_HW_VFE_IN_PDLIB       = 15,
+	CAM_ISP_HW_VFE_IN_LCR         = 16,
 	CAM_ISP_HW_VFE_IN_MAX,
 };
 
@@ -396,6 +402,7 @@ struct cam_vfe_bus_irq_evt_payload {
  * @lossy_threshold1            UBWC lossy threshold 1
  * @lossy_var_offset            UBWC offset variance threshold
  * @bandwidth limit             UBWC bandwidth limit
+ * @hw_ctx_id_mask:             hw context id mask in case of multi context
  */
 struct cam_vfe_generic_ubwc_plane_config {
 	uint32_t                port_type;
@@ -415,6 +422,7 @@ struct cam_vfe_generic_ubwc_plane_config {
 	uint32_t                lossy_threshold_1;
 	uint32_t                lossy_var_offset;
 	uint32_t                bandwidth_limit;
+	uint32_t                hw_ctx_id_mask;
 };
 
 /**

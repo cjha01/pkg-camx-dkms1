@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __UAPI_CAM_DEFS_H__
@@ -274,6 +274,7 @@ struct cam_iommu_handle {
 /* Register dump read type */
 #define CAM_REG_DUMP_READ_TYPE_CONT_RANGE       1
 #define CAM_REG_DUMP_READ_TYPE_DMI              2
+#define CAM_REG_DUMP_READ_TYPE_CTXT             3
 
 /* Max number of config writes to read from DMI */
 #define CAM_REG_DUMP_DMI_CONFIG_MAX             5
@@ -389,6 +390,59 @@ struct cam_ubwc_plane_cfg_v2 {
 	__u32                lossy_var_offset;
 	__u32                bandwidth_limit;
 	__u32                reserved[3];
+};
+
+/**
+ * struct cam_ubwc_plane_cfg_v3 - UBWC Plane configuration info
+ *
+ * @port_type:                  Port Type
+ * @meta_stride:                UBWC metadata stride
+ * @meta_size:                  UBWC metadata plane size
+ * @meta_offset:                UBWC metadata offset
+ * @packer_config:              UBWC packer config
+ * @mode_config:                UBWC mode config
+ * @static ctrl:                UBWC static ctrl
+ * @ctrl_2:                     UBWC ctrl 2
+ * @tile_config:                UBWC tile config
+ * @h_init:                     UBWC horizontal initial coordinate in pixels
+ * @v_init:                     UBWC vertical initial coordinate in lines
+ * @stats_ctrl_2:               UBWC stats control
+ * @lossy_threshold0            UBWC lossy threshold 0
+ * @lossy_threshold1            UBWC lossy threshold 1
+ * @lossy_var_offset            UBWC offset variance thrshold
+ * @bandwidth_limit:            BW counter limit
+ *                              BW limiter config skipped if value is 0xFFFF or more
+ *                              If skipped here, use generic BW limiter blob to
+ *                              configure the appropriate value.
+ * @hw_ctx_id_mask:             hw context id mask in case of multi context
+ *                              definitions for valid values defined in cam_isp.h
+ * @num_valid_params:           Number of valid params, to accommodate future changes
+ * @param_mask:                 Indicate params supported, to accommodate future changes
+ * @params:                     Indicate params supported, to accommodate future changes
+ */
+struct cam_ubwc_plane_cfg_v3 {
+	__u32                port_type;
+	__u32                meta_stride;
+	__u32                meta_size;
+	__u32                meta_offset;
+	__u32                packer_config;
+	__u32                mode_config_0;
+	__u32                mode_config_1;
+	__u32                tile_config;
+	__u32                h_init;
+	__u32                v_init;
+	__u32                static_ctrl;
+	__u32                ctrl_2;
+	__u32                stats_ctrl_2;
+	__u32                lossy_threshold_0;
+	__u32                lossy_threshold_1;
+	__u32                lossy_var_offset;
+	__u32                bandwidth_limit;
+	__u32                hw_ctx_id_mask;
+	__u32                num_valid_params;
+	__u32                param_mask;
+	__u32                params[6];
+
 };
 /**
  * struct cam_cmd_buf_desc - Command buffer descriptor
@@ -797,6 +851,24 @@ struct cam_ubwc_config_v2 {
 };
 
 /**
+ * struct cam_ubwc_config_v3 - UBWC Configuration Payload
+ *
+ * @api_version:         UBWC config api version
+ * @num_ports:           Number of ports to be configured, in case of MC,
+ *                       can have multiple entries for same out port
+ * @ubwc_plane_config:   Array of UBWC configurations per port
+ *                       Size [CAM_PACKET_MAX_PLANES - 1] per port
+ *                       as UBWC is supported on Y & C planes
+ *                       and therefore a max size of 2 planes
+ *
+ */
+struct cam_ubwc_config_v3 {
+	__u32   api_version;
+	__u32   num_ports;
+	struct cam_ubwc_plane_cfg_v3 ubwc_plane_cfg[1][CAM_PACKET_MAX_PLANES - 1];
+};
+
+/**
  * struct cam_cmd_mem_region_info -
  *              Cmd buffer region info
  *
@@ -873,10 +945,14 @@ struct cam_dmi_read_desc {
 };
 
 /**
- * struct cam_reg_read_info - Register read info for both reg continuous read
- *                            or DMI read
+ * struct cam_reg_read_info - Register read info for  continuous read
+ *                            or DMI read or Context based reg read
  *
- * @type                 : Whether Register range read or DMI read
+ * @type                 : Whether Register range read or DMI read or Context based reg read
+ *                         For context-based reading, we have to select context ID for reading
+ *                         that particular context Registers.
+ *                         if the type will be TYPE_CTX, we will write the context id and
+ *                         read the context registers. it will be similar to dmi read.
  * @reserved             : For acquired version 3, this corresponds to context_id
  * @reg_read             : Range of registers to read
  * @dmi_read             : DMI data to read

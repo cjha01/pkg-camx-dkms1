@@ -87,6 +87,7 @@ struct sensor_intf_params {
  * @bob_pwm_switch: Boolean flag to switch into PWM mode for BoB regulator
  * @last_flush_req: Last request to flush
  * @pipeline_delay: Sensor pipeline delay
+ * @pwr_ref_cnt : Ref counter for pwr up and pwr down.
  */
 struct cam_sensor_ctrl_t {
 	char device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
@@ -114,7 +115,49 @@ struct cam_sensor_ctrl_t {
 	bool bob_pwm_switch;
 	uint32_t last_flush_req;
 	uint16_t pipeline_delay;
+#ifdef CONFIG_SPECTRA_SENSOR_SYSFS_UTIL
+	int8_t pwr_ref_cnt;
+	struct kobject sysfs_kobj;
+	bool sysfs_state;
+#endif /*CONFIG_SPECTRA_SENSOR_SYSFS_UTIL*/
 };
+
+#ifdef CONFIG_SPECTRA_SENSOR_SYSFS_UTIL
+static inline int8_t cam_sensor_pwr_ref_read(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	return s_ctrl->pwr_ref_cnt;
+}
+
+static inline int8_t cam_sensor_pwr_ref_get(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	s_ctrl->pwr_ref_cnt++;
+
+	return s_ctrl->pwr_ref_cnt;
+}
+
+static inline void cam_sensor_pwr_ref_put(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	if (s_ctrl->pwr_ref_cnt > 0)
+		s_ctrl->pwr_ref_cnt--;
+}
+
+#else
+static inline int8_t cam_sensor_pwr_ref_read(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	return 1;
+}
+
+static inline int8_t cam_sensor_pwr_ref_get(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	return 1;
+}
+
+static inline void cam_sensor_pwr_ref_put(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	return;
+}
+
+#endif /* CONFIG_SPECTRA_SENSOR_SYSFS_UTIL */
 
 /**
  * @brief : API to remove SENSOR Hw from platform framework.
