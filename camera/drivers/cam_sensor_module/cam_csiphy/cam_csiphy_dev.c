@@ -17,7 +17,7 @@ static struct dentry *root_dentry;
 
 static inline void cam_csiphy_trigger_reg_dump(struct csiphy_device *csiphy_dev)
 {
-	cam_csiphy_common_status_reg_dump(csiphy_dev);
+	cam_csiphy_common_status_reg_dump(csiphy_dev, true);
 
 	if (csiphy_dev->en_full_phy_reg_dump)
 		cam_csiphy_reg_dump(&csiphy_dev->soc_info);
@@ -74,7 +74,7 @@ static int cam_csiphy_format_secure_phy_lane_info(
 static int cam_csiphy_get_session_index(struct csiphy_device *csiphy_dev,
 	uint32_t lane_assign)
 {
-	int i = 0;
+	int i;
 	struct cam_csiphy_param *param;
 
 	for (i = 0; i < CSIPHY_MAX_INSTANCES_PER_PHY; i++) {
@@ -278,6 +278,11 @@ static void cam_csiphy_subdev_handle_message(struct v4l2_subdev *sd,
 				"CSIPHY:%d Failed to handle CSID halt resume csid_state: %d",
 				phy_idx, halt_resume_info->csid_state);
 		}
+		break;
+	}
+	case CAM_SUBDEV_MESSAGE_CDR_SWEEP: {
+		cam_csiphy_update_qmargin_csid_vals(data, phy_idx);
+
 		break;
 	}
 	default:

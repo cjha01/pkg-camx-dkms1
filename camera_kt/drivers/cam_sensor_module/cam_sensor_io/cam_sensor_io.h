@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_SENSOR_IO_H_
@@ -59,6 +60,15 @@ int32_t camera_io_dev_read_seq(struct camera_io_master *io_master_info,
 
 /**
  * @io_master_info: I2C/SPI master information
+ * @read_setting: read settings information
+ *
+ * This API abstracts read functionality based on master type
+ */
+int32_t camera_io_dev_read_seq_v1(struct camera_io_master *io_master_info,
+	struct cam_sensor_i2c_reg_setting *read_setting);
+
+/**
+ * @io_master_info: I2C/SPI master information
  *
  * This API initializes the I2C/SPI master based on master type
  */
@@ -110,6 +120,19 @@ int32_t camera_io_dev_poll(struct camera_io_master *io_master_info,
 	enum camera_sensor_i2c_type addr_type,
 	enum camera_sensor_i2c_type data_type,
 	uint32_t delay_ms);
+
+int32_t camera_io_dev_sequential_xfer(struct camera_io_master *io_master_info,
+	struct cam_cmd_i2c_sequential_xfer *seq_xfer);
+
+/**
+ * @io_master_info: I2C/SPI master information
+ * @addr: write_setting: I2C reg write settings
+ *
+ * This API abstracts dev CCI read append write
+ */
+int32_t camera_io_dev_read_append_write(
+	struct camera_io_master *io_master_info,
+	struct cam_sensor_i2c_reg_setting *write_setting);
 
 #include "cam_sensor_i2c.h"
 #include "cam_sensor_spi.h"

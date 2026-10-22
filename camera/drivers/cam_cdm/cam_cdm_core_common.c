@@ -85,6 +85,8 @@ bool cam_cdm_set_cam_hw_version(
 	case CAM_CDM210_VERSION:
 	case CAM_CDM211_VERSION:
 	case CAM_CDM220_VERSION:
+	case CAM_CDM300_VERSION:
+	case CAM_CDM310_VERSION:
 		cam_version->major    = (ver & 0xF0000000);
 		cam_version->minor    = (ver & 0xFFF0000);
 		cam_version->incr     = (ver & 0xFFFF);
@@ -120,6 +122,8 @@ struct cam_cdm_utils_ops *cam_cdm_get_ops(
 		case CAM_CDM210_VERSION:
 		case CAM_CDM211_VERSION:
 		case CAM_CDM220_VERSION:
+		case CAM_CDM300_VERSION:
+		case CAM_CDM310_VERSION:
 			return &CDM170_ops;
 		default:
 			CAM_ERR(CAM_CDM, "CDM Version=%x not supported in util",

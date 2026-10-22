@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_SMMU_API_H_
@@ -147,6 +147,7 @@ struct region_buf_info {
  *
  * @param iova_start         : Start address of region
  * @param iova_len           : length of region
+ * @param mapped_iova_len    : mapped length of region
  * @param discard_iova_start : iova addr start from where should not be used
  * @param discard_iova_len   : length of discard iova region
  * @param phy_addr           : pa to which this va is mapped to
@@ -154,6 +155,7 @@ struct region_buf_info {
 struct cam_smmu_region_info {
 	dma_addr_t iova_start;
 	size_t iova_len;
+	size_t mapped_iova_len;
 	dma_addr_t discard_iova_start;
 	size_t discard_iova_len;
 	dma_addr_t phy_addr;

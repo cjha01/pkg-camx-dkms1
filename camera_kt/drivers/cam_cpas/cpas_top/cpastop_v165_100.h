@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
  #ifndef _CPASTOP_V165_100_H_
@@ -716,6 +717,10 @@ static struct cam_camnoc_info cam165_cpas100_camnoc_info = {
 	.err_logger = &cam165_cpas100_err_logger_offsets,
 	.errata_wa_list = &cam165_cpas100_errata_wa_list,
 	.fill_lvl_register = &cam165_cpas100_camnoc_fifo_info,
+};
+
+static struct cam_cpas_info cam165_cpas100_cpas_info = {
+	.target_name = "qcm6490",
 };
 
 #endif /* _CPASTOP_V165_100_H_ */

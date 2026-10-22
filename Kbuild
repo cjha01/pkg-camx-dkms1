@@ -34,6 +34,7 @@ ccflags-y += \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_csiphy \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_csiphy/include \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_ir_led \
+	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_lens_driver \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_flash \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_cci \
 	-I$(CAMERA_KERNEL_ROOT)/camera_kt/drivers/cam_sensor_module/cam_cci/include \
@@ -235,6 +236,7 @@ camera_$(CAMERA_ARCH)-y := \
 	camera_kt/drivers/cam_req_mgr/cam_mem_mgr.o \
 	camera_kt/drivers/cam_smmu/cam_smmu_api.o \
 	common/cam_common_util.o \
+	common/cam_icp_util.o \
 	common/cam_compat.o \
 	common/cam_debug_util.o \
 	common/cam_io_util.o \
@@ -362,7 +364,10 @@ camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_SENSOR) += \
 	camera_kt/drivers/cam_sensor_module/cam_hdmi_bdg/cam_hdmi_bdg_core.o \
 	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_dev.o \
 	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_core.o \
-	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_soc.o
+	camera_kt/drivers/cam_sensor_module/cam_ir_led/cam_ir_led_soc.o \
+	camera_kt/drivers/cam_sensor_module/cam_lens_driver/cam_lens_driver_dev.o \
+	camera_kt/drivers/cam_sensor_module/cam_lens_driver/cam_lens_driver_core.o \
+	camera_kt/drivers/cam_sensor_module/cam_lens_driver/cam_lens_driver_soc.o
 
 camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_CUSTOM) += \
 	camera_kt/drivers/cam_cust/cam_custom_hw_mgr/cam_custom_hw1/cam_custom_sub_mod_soc.o \
@@ -407,6 +412,9 @@ camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_SFE) += \
 	camera_kt/drivers/cam_isp/isp_hw_mgr/isp_hw/sfe_hw/sfe_bus/cam_sfe_bus.o \
 	camera_kt/drivers/cam_isp/isp_hw_mgr/isp_hw/sfe_hw/sfe_bus/cam_sfe_bus_rd.o \
 	camera_kt/drivers/cam_isp/isp_hw_mgr/isp_hw/sfe_hw/sfe_bus/cam_sfe_bus_wr.o
+
+camera_$(CAMERA_ARCH)-$(CONFIG_SPECTRA_SENSOR_SYSFS_UTIL) += \
+	camera_kt/drivers/cam_sensor_module/cam_cci/cam_cci_sysfs_util.o
 
 camera_$(CAMERA_ARCH)-y += camera_kt/drivers/camera_main.o
 
@@ -467,6 +475,7 @@ camera_$(CAMERA_ARCH)-y := \
 	camera/drivers/cam_cdm/cam_cdm_hw_core.o \
 	camera/drivers/cam_smmu/cam_smmu_api.o \
 	common/cam_common_util.o \
+	common/cam_icp_util.o \
 	common/cam_compat.o \
 	common/cam_debug_util.o \
 	common/cam_io_util.o \

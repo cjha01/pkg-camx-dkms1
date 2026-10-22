@@ -12,7 +12,8 @@
 #include "cam_tasklet_util.h"
 #include "cam_isp_hw.h"
 
-#define CAM_ISP_HW_NUM_MAX                       8
+/* Must stay in lockstep with CAM_IFE_HW_NUM_MAX (16) */
+#define CAM_ISP_HW_NUM_MAX                       16
 #define CAM_ISP_IN_SENSOR_ID_UNKNOWN             0xdeadbeef
 #define CAM_IFE_STREAM_GRP_INDEX_NONE            0xdeadbeef
 /**

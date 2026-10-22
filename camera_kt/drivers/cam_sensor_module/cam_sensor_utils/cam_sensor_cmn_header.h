@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
@@ -31,6 +30,7 @@
 #define CAM_FLASH_NAME     "cam-flash"
 #define CAM_EEPROM_NAME    "cam-eeprom"
 #define CAM_OIS_NAME       "cam-ois"
+#define CAM_LENS_DRIVER_NAME "cam-lensdriver"
 
 #define MAX_SYSTEM_PIPELINE_DELAY 2
 
@@ -54,6 +54,13 @@ enum camera_sensor_cmd_type {
 	CAMERA_SENSOR_FLASH_CMD_TYPE_WIDGET,
 	CAMERA_SENSOR_CMD_TYPE_RD_DATA,
 	CAMERA_SENSOR_FLASH_CMD_TYPE_INIT_FIRE,
+	CAMERA_SENSOR_LDM_CMD_TYPE_FW_INFO,
+	CAMERA_SENSOR_LDM_CMD_TYPE_I2C_CONT_RD_V2,
+	CAMERA_SENSOR_CMD_TYPE_IRLED_INIT,
+	CAMERA_SENSOR_CMD_TYPE_IRLED_FIRE,
+	CAMERA_SENSOR_CMD_TYPE_I2C_RD_APPEND_WR,
+	CAMERA_SENSOR_CMD_TYPE_I2C_SEQUENTIAL_XFER_LOCK,
+	CAMERA_SENSOR_CMD_TYPE_I2C_SEQUENTIAL_XFER_UNLOCK,
 	CAMERA_SENSOR_CMD_TYPE_MAX,
 };
 
@@ -65,6 +72,9 @@ enum camera_sensor_i2c_op_code {
 	CAMERA_SENSOR_I2C_OP_CONT_WR_BRST_VERF,
 	CAMERA_SENSOR_I2C_OP_CONT_WR_SEQN,
 	CAMERA_SENSOR_I2C_OP_CONT_WR_SEQN_VERF,
+	CAMERA_SENSOR_I2C_OP_RD_APPEND_WR,
+	CAMERA_SENSOR_I2C_OP_SEQUENTIAL_XFER_LOCK,
+	CAMERA_SENSOR_I2C_OP_SEQUENTIAL_XFER_UNLOCK,
 	CAMERA_SENSOR_I2C_OP_MAX,
 };
 
@@ -131,6 +141,9 @@ enum sensor_sub_module {
 	SUB_MODULE_OIS,
 	SUB_MODULE_IR_LED,
 	SUB_MODULE_EXT,
+	SUB_MODULE_LENS_DRIVER0,
+	SUB_MODULE_LENS_DRIVER1,
+	SUB_MODULE_LENS_DRIVER2,
 	SUB_MODULE_MAX,
 };
 
@@ -184,6 +197,14 @@ enum cam_ois_packet_opcodes {
 	CAM_OIS_PACKET_OPCODE_WRITE_TIME
 };
 
+enum cam_lens_driver_packet_opcodes {
+	CAM_LENS_DRIVER_PACKET_OPCODE_INIT,
+	CAM_LENS_DRIVER_PACKET_OPCODE_MOTOR_OPERATION,
+	CAM_LENS_DRIVER_PACKET_OPCODE_READ,
+	CAM_LENS_DRIVER_PACKET_OPCODE_STREAMON,
+	CAM_LENS_DRIVER_PACKET_OPCODE_STREAMOFF
+};
+
 enum msm_bus_perf_setting {
 	S_INIT,
 	S_PREVIEW,
@@ -234,7 +255,10 @@ enum cam_sensor_i2c_cmd_type {
 	CAM_SENSOR_I2C_READ_RANDOM,
 	CAM_SENSOR_I2C_READ_SEQ,
 	CAM_SENSOR_I2C_POLL,
-	CAM_SENSOR_I2C_SET_I2C_INFO
+	CAM_SENSOR_I2C_SET_I2C_INFO,
+	CAM_SENSOR_I2C_READ_APPEND_WRITE,
+	CAM_SENSOR_I2C_SEQUENTIAL_XFER_LOCK,
+	CAM_SENSOR_I2C_SEQUENTIAL_XFER_UNLOCK
 };
 
 struct common_header {
@@ -287,6 +311,8 @@ struct cam_sensor_i2c_reg_setting {
 	unsigned short delay;
 	uint8_t *read_buff;
 	uint32_t read_buff_len;
+	uint32_t read_bytes;
+	uint8_t write_only_data;
 };
 
 struct cam_sensor_i2c_seq_reg {
@@ -300,6 +326,7 @@ struct i2c_settings_list {
 	struct cam_sensor_i2c_reg_setting i2c_settings;
 	struct cam_sensor_i2c_seq_reg seq_settings;
 	struct cam_cmd_i2c_info slave_info;
+	struct cam_cmd_i2c_sequential_xfer seq_xfer;
 	enum cam_sensor_i2c_cmd_type op_code;
 	struct list_head list;
 };
@@ -424,5 +451,87 @@ struct msm_camera_gpio_conf {
 	uint8_t camera_on_table_size;
 	struct msm_camera_gpio_num_info *gpio_num_info;
 };
+
+#ifdef CONFIG_SPECTRA_SENSOR_SYSFS_UTIL
+/**
+ * cam_sysfs_add_cci()
+ * @brief Creates sysfs entries for cam_cci
+ */
+int32_t cam_sysfs_add_cci(void *dev);
+
+/**
+ * cam_sysfs_remove_cci()
+ * @brief Removes sysfs entries for cam_cci
+ */
+
+int32_t cam_sysfs_remove_cci(void *dev);
+/**
+ * cam_sysfs_exit()
+ * @brief Cleanup sysfs entries for cam_cci
+ */
+void cam_sysfs_exit(void);
+
+/**
+ * cam_sensor_add_device()
+ * @brief Creates sysfs entries for called sensor slot
+ */
+int32_t cam_sensor_add_device(void *ctrl_struct);
+
+/**
+ * sysfs_cam_sensor_power_up()
+ * @brief Helper function to powerup sensor
+ */
+int32_t sysfs_cam_sensor_power_up(void *val);
+
+/**
+ * sysfs_cam_sensor_power_down()
+ * @brief Helper function to powerdown sensor
+ */
+int32_t sysfs_cam_sensor_power_down(void *val);
+
+/**
+ * cam_sensor_remove_device()
+ * @brief Removes sysfs entries for all probed sensor slot
+ */
+int32_t cam_sensor_remove_device(void *val);
+
+#else
+
+static inline int32_t cam_sysfs_add_cci(void *dev)
+{
+	return 0;
+}
+
+static inline int32_t cam_sysfs_remove_cci(void *dev)
+{
+	return 0;
+}
+
+static inline void cam_sysfs_exit(void)
+{
+	return;
+}
+
+static inline int32_t cam_sensor_add_device(void *ctrl_struct)
+{
+	return 0;
+}
+
+static inline int32_t sysfs_cam_sensor_power_up(void *val)
+{
+	return 0;
+}
+
+static inline int32_t sysfs_cam_sensor_power_down(void *val)
+{
+	return 0;
+}
+
+static inline int32_t cam_sensor_remove_device(void *val)
+{
+	return 0;
+}
+
+#endif /* CONFIG_SPECTRA_SENSOR_SYSFS_UTIL */
 
 #endif /* _CAM_SENSOR_CMN_HEADER_ */

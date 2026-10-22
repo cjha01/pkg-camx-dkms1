@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/delay.h>
@@ -78,9 +79,13 @@ permission_error:
 }
 
 int cam_cdm_soc_load_dt_private(struct platform_device *pdev,
-	struct cam_cdm_private_dt_data *cdm_pvt_data)
+	struct cam_cdm_private_dt_data *cdm_pvt_data,
+	uint32_t max_num_fifo)
 {
 	int i, rc = -EINVAL, num_fifo_entries = 0, num_clients = 0;
+
+	if (!max_num_fifo || max_num_fifo > CAM_CDM_BL_FIFO_MAX)
+		max_num_fifo = CAM_CDM_BL_FIFO_MAX;
 
 	num_clients = of_property_count_strings(
 			pdev->dev.of_node, "cdm-client-names");
@@ -138,10 +143,11 @@ int cam_cdm_soc_load_dt_private(struct platform_device *pdev,
 		num_fifo_entries = of_property_count_u32_elems(
 			pdev->dev.of_node,
 			"fifo-depths");
-		if (num_fifo_entries != CAM_CDM_NUM_BL_FIFO) {
+		if (num_fifo_entries <= 0 ||
+				num_fifo_entries > max_num_fifo) {
 			CAM_ERR(CAM_CDM,
-				"Wrong number of configurable FIFOs %d",
-				num_fifo_entries);
+				"Wrong number of configurable FIFOs %d (max %d)",
+				num_fifo_entries, max_num_fifo);
 			rc = -EINVAL;
 			goto end;
 		}
@@ -158,7 +164,7 @@ int cam_cdm_soc_load_dt_private(struct platform_device *pdev,
 				i, cdm_pvt_data->fifo_depth[i]);
 		}
 	} else {
-		for (i = 0; i < CAM_CDM_BL_FIFO_MAX; i++) {
+		for (i = 0; i < max_num_fifo; i++) {
 			cdm_pvt_data->fifo_depth[i] =
 				CAM_CDM_BL_FIFO_LENGTH_MAX_DEFAULT;
 			CAM_DBG(CAM_CDM, "FIFO%d depth is %d",
@@ -196,13 +202,6 @@ int cam_hw_cdm_soc_get_dt_properties(struct cam_hw_info *cdm_hw,
 	if (!soc_ptr->soc_private)
 		return -ENOMEM;
 
-	rc = cam_cdm_soc_load_dt_private(soc_ptr->pdev,
-		soc_ptr->soc_private);
-	if (rc != 0) {
-		CAM_ERR(CAM_CDM, "Failed to load CDM dt private data");
-		goto error;
-	}
-
 	id = of_match_node(table, soc_ptr->pdev->dev.of_node);
 	if ((!id) || !(id->data)) {
 		CAM_ERR(CAM_CDM, "Failed to retrieve the CDM id table");
@@ -210,6 +209,15 @@ int cam_hw_cdm_soc_get_dt_properties(struct cam_hw_info *cdm_hw,
 	}
 	cdm_core->offsets =
 		(struct cam_cdm_hw_reg_offset *)id->data;
+
+	rc = cam_cdm_soc_load_dt_private(soc_ptr->pdev,
+		soc_ptr->soc_private,
+		(cdm_core->offsets && cdm_core->offsets->reg_data) ?
+			cdm_core->offsets->reg_data->num_bl_fifo : 0);
+	if (rc != 0) {
+		CAM_ERR(CAM_CDM, "Failed to load CDM dt private data");
+		goto error;
+	}
 
 	CAM_DBG(CAM_CDM, "name %s", cdm_core->name);
 

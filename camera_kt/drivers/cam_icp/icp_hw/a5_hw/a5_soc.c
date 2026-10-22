@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/io.h>
@@ -34,12 +35,10 @@ static int cam_a5_get_dt_properties(struct cam_hw_soc_info *soc_info)
 	a5_soc_info = soc_info->soc_private;
 
 	rc = of_property_read_string(of_node, "fw_name", &fw_name);
-	if (rc < 0) {
-		CAM_ERR(CAM_ICP, "fw_name read failed");
-		goto end;
-	}
-
-	a5_soc_info->fw_name = fw_name;
+	if (rc < 0)
+		a5_soc_info->fw_name = NULL;
+	else
+		a5_soc_info->fw_name = fw_name;
 
 	rc = of_property_read_u32(of_node, "qos-val",
 		&a5_soc_info->a5_qos_val);

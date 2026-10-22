@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/uaccess.h>
+#include <linux/compat.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/workqueue.h>
