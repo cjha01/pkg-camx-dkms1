@@ -1265,6 +1265,12 @@ static char *__cam_isp_ife_sfe_resource_handle_id_to_type(
 	case CAM_ISP_IFE_OUT_RES_RDI_3:                 return "IFE_RDI_3";
 	case CAM_ISP_IFE_OUT_RES_RDI_4:                 return "IFE_RDI_4";
 	case CAM_ISP_IFE_OUT_RES_RDI_5:                 return "IFE_RDI_5";
+	case CAM_ISP_IFE_OUT_RES_RDI_6:                 return "IFE_RDI_6";
+	case CAM_ISP_IFE_OUT_RES_RDI_7:                 return "IFE_RDI_7";
+	case CAM_ISP_IFE_OUT_RES_RDI_8:                 return "IFE_RDI_8";
+	case CAM_ISP_IFE_OUT_RES_RDI_9:                 return "IFE_RDI_9";
+	case CAM_ISP_IFE_OUT_RES_RDI_10:                return "IFE_RDI_10";
+	case CAM_ISP_IFE_OUT_RES_RDI_11:                return "IFE_RDI_11";
 	case CAM_ISP_IFE_OUT_RES_STATS_HDR_BE:          return "IFE_STATS_HDR_BE";
 	case CAM_ISP_IFE_OUT_RES_STATS_HDR_BHIST:       return "IFE_STATS_HDR_BHIST";
 	case CAM_ISP_IFE_OUT_RES_STATS_TL_BG:           return "IFE_STATS_TL_BG";
@@ -1296,6 +1302,9 @@ static char *__cam_isp_ife_sfe_resource_handle_id_to_type(
 	case CAM_ISP_IFE_OUT_RES_IR:                    return "IR_OUT";
 	case CAM_ISP_IFE_OUT_RES_STATS_IR_BG:           return "STATS_IR_BG";
 	case CAM_ISP_IFE_OUT_RES_STATS_IR_BHIST:        return "STATS_IR_BHIST";
+	case CAM_ISP_IFE_OUT_RES_STATS_BG_IRC_AEC:      return "STATS_BG_IRC_AEC";
+	case CAM_ISP_IFE_OUT_RES_STATS_BHIST_IRC_AEC:   return "STATS_BHIST_IRC_AEC";
+	case CAM_ISP_IFE_OUT_RES_STATS_AEC_BG:          return "IFE_STATS_AEC_BG";
 	/* SFE output ports */
 	case CAM_ISP_SFE_OUT_RES_RDI_0:                 return "SFE_RDI_0";
 	case CAM_ISP_SFE_OUT_RES_RDI_1:                 return "SFE_RDI_1";
@@ -8176,6 +8185,7 @@ static int __cam_isp_ctx_acquire_hw_v2(struct cam_context *ctx,
 	ctx_isp->per_port_en = isp_hw_cmd_args.u.ctx_info.is_per_port_en;
 	ctx->ctxt_to_hw_map = param.ctxt_to_hw_map;
 	ctx->hw_mgr_ctx_id = param.hw_mgr_ctx_id;
+	ctx_isp->bubble_recover_dis = isp_hw_cmd_args.u.ctx_info.bubble_recover_dis;
 
 	snprintf(ctx->ctx_id_string, sizeof(ctx->ctx_id_string),
 		"%s_ctx[%d]_hwmgrctx[%d]_hwidx[0x%x]",

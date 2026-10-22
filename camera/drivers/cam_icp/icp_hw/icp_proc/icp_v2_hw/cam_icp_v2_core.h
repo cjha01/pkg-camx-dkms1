@@ -11,6 +11,7 @@
 #include "cam_icp_hw_intf.h"
 #include "hfi_intf.h"
 #include "cam_icp_v2_reg.h"
+#include "cam_icp_util.h"
 
 /* Domain ID masks */
 #define ICP_V2_DOMAIN_MASK_CFG_0 0x00FF00FF
@@ -33,13 +34,13 @@ struct cam_icp_v2_core_info {
 	int hfi_handle;
 	enum cam_icp_v2_reg_base irq_regbase_idx;
 	struct {
-		const struct firmware *fw_elf;
-		void *fw;
 		uint32_t fw_buf;
 		uintptr_t fw_kva_addr;
 		uint64_t fw_buf_len;
 	} fw_params;
 	struct camera_firmware *fw;
+	struct cam_icp_fw_cache fw_cache;
+	char fw_name[ICP_FW_NAME_MAX_SIZE];
 	bool cpas_start;
 	bool use_sec_pil;
 	bool is_irq_test;

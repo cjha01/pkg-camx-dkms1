@@ -9,6 +9,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/of_device.h>
 #include <linux/timer.h>
+#include <linux/firmware.h>
 #include "cam_icp_v1_core.h"
 #include "cam_io_util.h"
 #include "cam_hw.h"
@@ -227,6 +228,12 @@ static void cam_icp_v1_component_unbind(struct device *dev,
 	cam_icp_v1_soc_info_deinit(&icp_v1_dev->soc_info);
 
 	max_icp_v1_hw_idx = -1;
+
+	if (core_info->fw_cache.loaded && core_info->fw_cache.fw) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+		core_info->fw_cache.loaded = false;
+	}
 
 	kfree(icp_v1_dev->core_info);
 	kfree(icp_v1_dev);

@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
@@ -88,6 +87,7 @@ typedef struct {
  * @CAM_NOMINAL_VOTE   : Nominal vote
  * @CAM_NOMINALL1_VOTE : Nominal plus vote
  * @CAM_TURBO_VOTE     : Turbo vote
+ * @CAM_TURBOL1_VOTE   : Turbo plus vote
  * @CAM_MAX_VOTE       : Max voting level, This is invalid level.
  */
 enum cam_vote_level {
@@ -100,6 +100,7 @@ enum cam_vote_level {
 	CAM_NOMINAL_VOTE,
 	CAM_NOMINALL1_VOTE,
 	CAM_TURBO_VOTE,
+	CAM_TURBOL1_VOTE,
 	CAM_MAX_VOTE,
 };
 
@@ -363,6 +364,21 @@ struct cam_hw_soc_dump_args {
 	uint64_t             request_id;
 	size_t               offset;
 	uint32_t             buf_handle;
+};
+
+/**
+ * struct cam_hw_soc_skip_dump_args :   SOC Dump args for skiping offset
+ *
+ * @skip_regdump         skip offset is required for dump or not
+ * @start_offset:        offset for skipping reg dump
+ * @stop_offset:         offset for stoping skip reg dump
+ * @reg_base_type:       register base type
+ */
+struct cam_hw_soc_skip_dump_args {
+	bool                skip_regdump;
+	uint32_t            start_offset;
+	uint32_t            stop_offset;
+	uint32_t            reg_base_type;
 };
 
 /*
@@ -875,6 +891,7 @@ typedef int (*cam_soc_util_regspace_data_cb)(uint32_t reg_base_type,
  * @reg_data_cb:           Callback function to get reg space info based on type
  *                         in command buffer
  * @soc_dump_args:         Dump buffer args to dump the soc information.
+ * @soc_skip_dump_args:    Args to indicate register range to skip during dump.
  * @user_triggered_dump:   Flag to indicate if the dump request is issued by
  *                         user.
  * @return:                Success or Failure
@@ -883,6 +900,7 @@ int cam_soc_util_reg_dump_to_cmd_buf(void *ctx,
 	struct cam_cmd_buf_desc *cmd_desc, uint64_t req_id,
 	cam_soc_util_regspace_data_cb reg_data_cb,
 	struct cam_hw_soc_dump_args *soc_dump_args,
+	struct cam_hw_soc_skip_dump_args *soc_skip_dump_args,
 	bool user_triggered_dump);
 
 /**

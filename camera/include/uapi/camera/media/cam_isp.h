@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __UAPI_CAM_ISP_H__
@@ -141,6 +141,7 @@
 #define CAM_ISP_GENERIC_BLOB_TYPE_IRQ_COMP_CFG              31
 #define CAM_ISP_GENERIC_BLOB_TYPE_VFE_OUT_CONFIG_V2         32
 #define CAM_ISP_GENERIC_BLOB_TYPE_IFE_FCG_CFG               33
+#define CAM_ISP_GENERIC_BLOB_TYPE_UBWC_CONFIG_V3            34
 
 #define CAM_ISP_VC_DT_CFG    4
 
@@ -151,10 +152,15 @@
 #define CAM_ISP_IFE2_LITE_HW     0x10
 #define CAM_ISP_IFE3_LITE_HW     0x20
 #define CAM_ISP_IFE4_LITE_HW     0x40
+#define CAM_ISP_IFE5_LITE_HW     0x80
 #define CAM_ISP_IFE2_HW          0x100
 #define CAM_ISP_SFE0_HW          0x1000
 #define CAM_ISP_SFE1_HW          0x2000
 #define CAM_ISP_SFE2_HW          0x4000
+#define CAM_ISP_IFE6_LITE_HW     0x8000
+#define CAM_ISP_IFE7_LITE_HW     0x10000
+#define CAM_ISP_IFE8_LITE_HW     0x20000
+#define CAM_ISP_IFE9_LITE_HW     0x40000
 
 #define CAM_ISP_PXL_PATH          0x1
 #define CAM_ISP_PPP_PATH          0x2
@@ -174,6 +180,15 @@
 #define CAM_ISP_VIRTUAL_RDI3_PATH 0x4000
 #define CAM_ISP_VIRTUAL_RDI4_PATH 0x8000
 #define CAM_ISP_VIRTUAL_RDI5_PATH 0x10000
+#define CAM_ISP_RDI6_PATH         0x20000
+#define CAM_ISP_RDI7_PATH         0x40000
+#define CAM_ISP_RDI8_PATH         0x80000
+#define CAM_ISP_RDI9_PATH         0x100000
+#define CAM_ISP_RDI10_PATH        0x200000
+#define CAM_ISP_RDI11_PATH        0x400000
+#define CAM_ISP_PXL3_PATH         0x800000
+#define CAM_ISP_VIRTUAL_RDI6_PATH  0x1000000
+#define CAM_ISP_VIRTUAL_RDI7_PATH  0x2000000
 
 /*
  * Multi Context Mask
@@ -181,6 +196,7 @@
 #define  CAM_ISP_MULTI_CTXT0_MASK 0x1
 #define  CAM_ISP_MULTI_CTXT1_MASK 0x2
 #define  CAM_ISP_MULTI_CTXT2_MASK 0x4
+#define  CAM_ISP_MULTI_CTXT3_MASK 0x8
 
 /* Per Path Usage Data */
 #define CAM_ISP_USAGE_INVALID     0

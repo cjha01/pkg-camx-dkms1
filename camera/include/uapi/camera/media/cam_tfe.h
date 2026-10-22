@@ -156,7 +156,10 @@ struct cam_isp_tfe_query_cap_cmd_v2 {
 	__s32                           num_dev;
 	struct cam_iommu_handle         device_iommu;
 	struct cam_iommu_handle         cdm_iommu;
-	struct cam_isp_tfe_dev_cap_info dev_caps[1];
+	union {
+		struct cam_isp_tfe_dev_cap_info dev_caps[1];
+		__DECLARE_FLEX_ARRAY(struct cam_isp_tfe_dev_cap_info, dev_caps_flex);
+	};
 };
 
 /* Acquire Device */

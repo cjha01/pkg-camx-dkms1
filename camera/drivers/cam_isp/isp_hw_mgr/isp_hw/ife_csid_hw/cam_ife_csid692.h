@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_IFE_CSID_692_H_
@@ -55,6 +55,8 @@ static struct cam_ife_csid_ver2_reg_info cam_ife_csid_692_reg_info = {
 	.rx_irq_desc        = &cam_ife_csid_690_rx_irq_desc,
 	.path_irq_desc      = cam_ife_csid_690_path_irq_desc,
 	.num_top_err_irqs   = cam_ife_csid_690_num_top_regs,
+	.top_debug_mask     = &cam_ife_csid_690_top_debug_mask,
+	.rx_debug_mask      = &cam_ife_csid_690_rx_debug_mask,
 	.num_top_regs       = 1,
 	.num_rx_regs        = 1,
 };

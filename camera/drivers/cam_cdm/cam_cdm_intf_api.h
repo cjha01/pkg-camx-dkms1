@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CDM_API_H_
@@ -56,6 +56,12 @@ enum cam_cdm_bl_fifo_queue {
 	CAM_CDM_BL_FIFO_1,
 	CAM_CDM_BL_FIFO_2,
 	CAM_CDM_BL_FIFO_3,
+	CAM_CDM_BL_FIFO_4,
+	CAM_CDM_BL_FIFO_5,
+	CAM_CDM_BL_FIFO_6,
+	CAM_CDM_BL_FIFO_7,
+	CAM_CDM_BL_FIFO_8,
+	CAM_CDM_BL_FIFO_9,
 	CAM_CDM_BL_FIFO_MAX,
 };
 
@@ -120,6 +126,9 @@ struct cam_cdm_acquire_data {
  *           by mem_handle
  * @enable_debug_gen_irq : bool flag to submit extra gen_irq afteR bl_command
  * @arbitrate : bool flag to arbitrate on submitted BL boundary
+ * @nbw : bool flag to set Non-Blocking Wait (NBW) bit in BL FIFO entry.
+ *        Must be set when the BL entry contains a NB_WAIT or NB_WAIT_GEN_IRQ
+ *        command (CDM 3.x). Ignored (written as 0) on CDM 2.x.
  */
 struct cam_cdm_bl_cmd {
 	union {
@@ -131,6 +140,7 @@ struct cam_cdm_bl_cmd {
 	uint32_t len;
 	bool enable_debug_gen_irq;
 	bool arbitrate;
+	bool nbw;
 };
 
 /**
