@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_VFE_TOP_VER4_H_
@@ -135,6 +135,11 @@ struct cam_vfe_top_ver4_pdaf_violation_desc {
 	char     *desc;
 };
 
+struct cam_vfe_top_ver4_ipp_violation_desc {
+	uint32_t  bitmask;
+	char     *desc;
+};
+
 struct cam_vfe_top_ver4_bayer_violation_desc {
 	uint32_t bitmask;
 	char     *desc;
@@ -175,6 +180,8 @@ struct cam_vfe_top_ver4_hw_info {
 	struct cam_vfe_ver4_path_reg_data              *reg_data;
 	struct cam_vfe_top_ver4_wr_client_desc         *wr_client_desc;
 	struct cam_vfe_top_ver4_module_desc            *ipp_module_desc;
+	uint32_t                                        num_ipp_violation_errors;
+	struct cam_vfe_top_ver4_ipp_violation_desc     *ipp_violation_desc;
 	struct cam_vfe_bayer_ver4_module_desc          *bayer_module_desc;
 	uint32_t                                        num_reg;
 	struct cam_vfe_top_ver4_debug_reg_info        (*debug_reg_info)[][8];

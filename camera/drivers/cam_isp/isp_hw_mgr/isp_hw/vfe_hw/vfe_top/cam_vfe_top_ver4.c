@@ -115,6 +115,7 @@ struct cam_vfe_mux_ver4_data {
 	bool                               sfe_binned_epoch_cfg;
 	bool                               enable_sof_irq_debug;
 	bool                               handle_camif_irq;
+	bool                               per_port_en;
 	uint32_t                           hw_ctxt_mask;
 	uint32_t  stored_irq_masks[VFE_TOP_VER4_MAX_STORED_MASKS][CAM_VFE_TOP_IRQ_MAX];
 };
@@ -392,7 +393,8 @@ static int cam_vfe_top_ver4_enable_irq(
 					rsrc_data->vfe_irq_controller,
 					rsrc_data->irq_err_handle,
 					irq_args->enable_irq,
-					rsrc_data->stored_irq_masks[VFE_TOP_VER4_ERR_MASK]);
+					rsrc_data->stored_irq_masks[VFE_TOP_VER4_ERR_MASK],
+					vfe_res->tasklet_info);
 
 				if (rc) {
 					CAM_ERR(CAM_ISP, "Error IRQ handle update failure");
@@ -596,6 +598,7 @@ static void cam_vfe_top_ver4_print_ipp_violation_info(
 	struct cam_vfe_top_ver4_common_data *common_data;
 	void __iomem                        *base;
 	uint32_t                             val = 0;
+	uint32_t                             i = 0;
 
 	common_data = &top_priv->common_data;
 	soc_info    =  top_priv->top_common.soc_info;
@@ -612,6 +615,13 @@ static void cam_vfe_top_ver4_print_ipp_violation_info(
 			common_data->hw_info->ipp_module_desc[val].id,
 			common_data->hw_info->ipp_module_desc[val].desc);
 
+	for (i = 0; i < common_data->hw_info->num_ipp_violation_errors; i++) {
+		if (common_data->hw_info->ipp_violation_desc[i].bitmask & val) {
+			CAM_ERR(CAM_ISP, "VFE[%u] IPP Violation Module: %s",
+				soc_info->index,
+				common_data->hw_info->ipp_violation_desc[i].desc);
+		}
+	}
 }
 
 static void cam_vfe_top_ver4_print_top_irq_error(
@@ -1118,8 +1128,10 @@ static int cam_vfe_top_ver4_reserve(void *device_priv,
 			vfe_priv->hw_ctxt_mask = acquire_args->hw_ctxt_mask;
 			top_priv->top_common.mux_rsrc[i].res_state =
 				CAM_ISP_RESOURCE_STATE_RESERVED;
-			if (acquire_args->in_port->per_port_en && args->per_port_acquire)
+			if (acquire_args->in_port->per_port_en && args->per_port_acquire) {
 				top_priv->top_common.mux_rsrc[i].is_per_port_acquire = true;
+				vfe_priv->per_port_en = true;
+			}
 			acquire_args->rsrc_node = &top_priv->top_common.mux_rsrc[i];
 
 			rc = 0;
@@ -1159,6 +1171,7 @@ static int cam_vfe_top_ver4_release(void *device_priv,
 	memset(&vfe_priv->top_priv->sof_ts_reg_addr, 0,
 		sizeof(vfe_priv->top_priv->sof_ts_reg_addr));
 	vfe_priv->hw_ctxt_mask = 0;
+	vfe_priv->per_port_en = false;
 
 	for (i = 0; i < VFE_TOP_VER4_MAX_STORED_MASKS; i++) {
 		for (j = 0; j < CAM_VFE_TOP_IRQ_MAX; j++)
@@ -2250,7 +2263,8 @@ skip_core_cfg:
 		rsrc_data->stored_irq_masks[VFE_TOP_VER4_FRAME_IRQ_MASK][CAM_VFE_TOP_IRQ_REG0],
 		rsrc_data->stored_irq_masks[VFE_TOP_VER4_FRAME_IRQ_MASK][CAM_VFE_TOP_IRQ_REG1]);
 
-	if (vfe_res->is_per_port_start) {
+	if (vfe_res->is_per_port_start ||
+		(!vfe_res->linked && rsrc_data->per_port_en)) {
 		CAM_DBG(CAM_ISP, "Skipping irq subscribe for resources that are not updated");
 		goto skip_irq_subscribe;
 	}
@@ -2448,11 +2462,11 @@ static int cam_vfe_resource_deinit(
 	soc_info = rsrc_data->soc_info;
 
 	if ((rsrc_data->dsp_mode >= CAM_ISP_DSP_MODE_ONE_WAY) &&
-		(rsrc_data->dsp_mode <= CAM_ISP_DSP_MODE_ROUND)) {
+			(rsrc_data->dsp_mode <= CAM_ISP_DSP_MODE_ROUND)) {
 		rc = cam_vfe_soc_disable_clk(soc_info, CAM_VFE_DSP_CLK_NAME);
 		if (rc)
 			CAM_ERR(CAM_ISP, "VFE:%u failed to disable dsp clk",
-				vfe_res->hw_intf->hw_idx);
+					vfe_res->hw_intf->hw_idx);
 	}
 
 	CAM_DBG(CAM_ISP, "VFE:%u Res: %s DeInit Done",
@@ -2549,7 +2563,7 @@ int cam_vfe_top_ver4_init(
 	void                                   *vfe_irq_controller,
 	struct cam_vfe_top                    **vfe_top_ptr)
 {
-	int i, j, rc = 0;
+	int i, j = 0, rc = 0;
 	struct cam_vfe_top_ver4_priv           *top_priv = NULL;
 	struct cam_vfe_top_ver4_hw_info        *hw_info = top_hw_info;
 	struct cam_vfe_top                     *vfe_top;
@@ -2581,8 +2595,7 @@ int cam_vfe_top_ver4_init(
 
 	top_priv->top_common.num_mux = hw_info->num_mux;
 
-	for (i = 0, j = 0; i < top_priv->top_common.num_mux &&
-		j < hw_info->num_rdi; i++) {
+	for (i = 0; i < top_priv->top_common.num_mux; i++) {
 		top_priv->top_common.mux_rsrc[i].res_type =
 			CAM_ISP_RESOURCE_VFE_IN;
 		top_priv->top_common.mux_rsrc[i].hw_intf = hw_intf;
@@ -2615,7 +2628,7 @@ int cam_vfe_top_ver4_init(
 			scnprintf(top_priv->top_common.mux_rsrc[i].res_name,
 				CAM_ISP_RES_NAME_LEN, "PDLIB");
 		} else if (hw_info->mux_type[i] ==
-			CAM_VFE_RDI_VER_1_0) {
+			CAM_VFE_RDI_VER_1_0 && j < hw_info->num_rdi) {
 			/* set the RDI resource id */
 			top_priv->top_common.mux_rsrc[i].res_id =
 				CAM_ISP_HW_VFE_IN_RDI0 + j;

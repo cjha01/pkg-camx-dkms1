@@ -6,6 +6,9 @@
 
 #include <linux/of_address.h>
 #include <linux/firmware/qcom/qcom_scm.h>
+#if IS_ENABLED(CONFIG_QCOM_PAS)
+#include <linux/firmware/qcom/qcom_pas.h>
+#endif
 #include <linux/soc/qcom/mdt_loader.h>
 #include <linux/kallsyms.h>
 
@@ -18,6 +21,7 @@
 #include "hfi_intf.h"
 #include "hfi_sys_defs.h"
 #include "cam_icp_proc_common.h"
+#include "cam_icp_util.h"
 #include "cam_icp_v2_core.h"
 #include "cam_common_util.h"
 #include "cam_compat.h"
@@ -27,21 +31,22 @@
 #define TZ_STATE_SUSPEND 0
 #define TZ_STATE_RESUME  1
 
-#define ICP_FW_NAME_MAX_SIZE    32
-
 #define ICP_V2_IRQ_TEST_TIMEOUT 1000
 
 typedef void *(*devm_qcom_scm_pas_context_alloc_t)(
 		struct device *dev, u32 pas_id, u64 start, size_t size);
 
 typedef int (*qcom_mdt_pas_load_t)(
-		struct cam_qcom_scm_pas_context *ctx,
+		void *ctx,
 		const struct firmware *fw,
 		const char *firmware,
 		phys_addr_t *reloc_base);
 
+typedef void (*qcom_scm_pas_metadata_release_t)(
+		void *ctx);
+
 typedef int (*qcom_scm_pas_prepare_and_auth_reset_t)(
-		struct cam_qcom_scm_pas_context *ctx);
+		void *ctx);
 
 static const struct hfi_ops hfi_icp_v2_ops = {
 	.irq_raise = cam_icp_v2_irq_raise,
@@ -457,13 +462,14 @@ static int32_t __cam_non_sec_load_fw(void *device_priv)
 {
 	int32_t rc = 0;
 	uint32_t fw_size;
-	char firmware_name[ICP_FW_NAME_MAX_SIZE] = {0};
+	int num_candidates;
 	const char               *fw_name;
 	const uint8_t            *fw_start = NULL;
 	struct cam_hw_info       *icp_v2_dev = device_priv;
 	struct cam_hw_soc_info   *soc_info = NULL;
 	struct cam_icp_v2_core_info *core_info = NULL;
 	struct platform_device   *pdev = NULL;
+	struct cam_icp_fw_candidate candidates[ICP_FW_MAX_CANDIDATES];
 
 	if (!device_priv) {
 		CAM_ERR(CAM_ICP, "Invalid cam_dev_info");
@@ -482,35 +488,38 @@ static int32_t __cam_non_sec_load_fw(void *device_priv)
 
 	rc = of_property_read_string(pdev->dev.of_node, "fw_name",
 		&fw_name);
-	if (rc) {
-		CAM_ERR(CAM_ICP, "FW image name not found");
-		return rc;
+	if (rc)
+		fw_name = NULL;
+
+	if (!core_info->fw_cache.loaded) {
+		num_candidates = cam_icp_get_fw_candidates(fw_name,
+			".elf", candidates, ARRAY_SIZE(candidates));
+		if (num_candidates < 0) {
+			CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
+					num_candidates);
+			return num_candidates;
+		}
+
+		rc = cam_icp_request_fw_from_candidates(&pdev->dev,
+			candidates, num_candidates, &core_info->fw_cache.fw);
+		if (rc < 0) {
+			CAM_ERR(CAM_ICP, "Failed to locate firmware");
+			return rc;
+		}
+
+		CAM_INFO(CAM_ICP, "[%s] Loaded ELF firmware from disk", soc_info->dev_name);
+	} else {
+		CAM_INFO(CAM_ICP, "[%s] Reusing cached ELF firmware, skipping disk read",
+			soc_info->dev_name);
 	}
 
-	/* Account for ".elf" size [4 characters] */
-	if (strlen(fw_name) >= (ICP_FW_NAME_MAX_SIZE - 4)) {
-		CAM_ERR(CAM_ICP, "Invalid fw name %s", fw_name);
-		return -EINVAL;
-	}
-
-	scnprintf(firmware_name, ARRAY_SIZE(firmware_name),
-		"%s.elf", fw_name);
-
-	rc = firmware_request_nowarn(&core_info->fw_params.fw_elf,
-		firmware_name, &pdev->dev);
-	if (rc) {
-		CAM_ERR(CAM_ICP, "Failed to locate %s fw: %d",
-			firmware_name, rc);
-		return rc;
-	}
-
-	if (!core_info->fw_params.fw_elf) {
+	if (!core_info->fw_cache.fw) {
 		CAM_ERR(CAM_ICP, "Invalid elf size");
 		rc = -EINVAL;
 		goto fw_download_failed;
 	}
 
-	fw_start = core_info->fw_params.fw_elf->data;
+	fw_start = core_info->fw_cache.fw->data;
 
 	rc = cam_icp_validate_fw(fw_start, EM_XTENSA);
 	if (rc) {
@@ -538,8 +547,13 @@ static int32_t __cam_non_sec_load_fw(void *device_priv)
 		goto fw_download_failed;
 	}
 
+	core_info->fw_cache.loaded = true;
+
 fw_download_failed:
-	release_firmware(core_info->fw_params.fw_elf);
+	if (rc && core_info->fw_cache.fw && !core_info->fw_cache.loaded) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+	}
 	return rc;
 }
 #else /* #ifndef CONFIG_CAM_PRESIL */
@@ -608,67 +622,77 @@ err:
 
 #if IS_REACHABLE(CONFIG_QCOM_MDT_LOADER)
 static int __load_firmware(struct platform_device *pdev,
-	uint32_t fw_pas_id, struct camera_firmware *fw)
+	uint32_t fw_pas_id, struct cam_icp_v2_core_info *core_info)
 {
 	const char *fw_name;
-	const struct firmware *firmware = NULL;
-	char firmware_name[ICP_FW_NAME_MAX_SIZE] = {0};
 	struct device_node *node;
 	struct resource res;
+	struct cam_icp_fw_candidate candidates[ICP_FW_MAX_CANDIDATES];
 	phys_addr_t res_start;
 	size_t res_size;
 	ssize_t fw_size;
 	devm_qcom_scm_pas_context_alloc_t fn_devm_qcom_scm_pas_context_alloc = NULL;
 	qcom_mdt_pas_load_t fn_qcom_mdt_pas_load = NULL;
 	int rc;
+	int num_candidates;
+	int selected_idx = -1;
+#if !IS_ENABLED(CONFIG_QCOM_PAS)
+	qcom_scm_pas_metadata_release_t fn_qcom_scm_pas_metadata_release = NULL;
+#endif
 
-	if (!pdev) {
+	if (!pdev || !core_info) {
 		CAM_ERR(CAM_ICP, "invalid args");
 		return -EINVAL;
 	}
 
 	rc = of_property_read_string(pdev->dev.of_node, "fw_name",
 		&fw_name);
-	if (rc) {
-		CAM_ERR(CAM_ICP, "FW image name not found");
-		return rc;
-	}
+	if (rc)
+		fw_name = NULL;
 
-	/* Account for ".mdt" size [4 characters] */
-	if (strlen(fw_name) >= (ICP_FW_NAME_MAX_SIZE - 4)) {
-		CAM_ERR(CAM_ICP, "Invalid fw name %s", fw_name);
-		return -EINVAL;
-	}
+	if (!core_info->fw_cache.loaded) {
+		num_candidates = cam_icp_get_fw_candidates(fw_name,
+			".mbn", candidates, ARRAY_SIZE(candidates));
+		if (num_candidates < 0) {
+			CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
+				num_candidates);
+			return num_candidates;
+		}
 
-	scnprintf(firmware_name, ARRAY_SIZE(firmware_name),
-		"%s.mbn", fw_name);
+		selected_idx = cam_icp_request_fw_from_candidates(&pdev->dev,
+			candidates, num_candidates, &core_info->fw_cache.fw);
+		if (selected_idx < 0) {
+			CAM_ERR(CAM_ICP, "Failed to locate firmware from disk");
+			return selected_idx;
+		}
+
+		strscpy(core_info->fw_name, candidates[selected_idx].name,
+			sizeof(core_info->fw_name));
+		CAM_INFO(CAM_ICP, "[sec-PIL] Loaded MBN firmware from disk, candidate idx=%d",
+			selected_idx);
+	} else {
+		CAM_INFO(CAM_ICP, "[sec-PIL] Reusing cached MBN firmware, skipping disk read");
+	}
 
 	node = of_parse_phandle(pdev->dev.of_node, "memory-region", 0);
 	if (!node) {
 		CAM_ERR(CAM_ICP, "firmware memory region not found");
-		return -ENODEV;
+		rc = -ENODEV;
+		goto out;
 	}
 
 	rc = of_address_to_resource(node, 0, &res);
 	of_node_put(node);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "missing firmware resource address rc=%d", rc);
-		return rc;
+		goto out;
 	}
 
 	res_start = res.start;
 	res_size = (size_t)resource_size(&res);
 
-	rc = firmware_request_nowarn(&firmware, firmware_name, &pdev->dev);
-	if (rc) {
-		CAM_ERR(CAM_ICP,
-			"error requesting %s firmware rc=%d",
-			firmware_name, rc);
-		return rc;
-	}
-
 	/* Make sure carveout and binary sizes are compatible */
-	fw_size = qcom_mdt_get_size(firmware);
+	fw_size = qcom_mdt_get_size(core_info->fw_cache.fw);
 	if (fw_size < 0 || res_size < (size_t)fw_size) {
 		CAM_ERR(CAM_ICP,
 			"carveout[sz=%zu] not big enough for firmware[sz=%zd]",
@@ -677,25 +701,32 @@ static int __load_firmware(struct platform_device *pdev,
 		goto out;
 	}
 
+#if IS_ENABLED(CONFIG_QCOM_PAS)
+	core_info->fw->ctx = (struct cam_qcom_pas_context *)
+		devm_qcom_pas_context_alloc(&pdev->dev, fw_pas_id,
+					    res_start, res_size);
+#else
 	fn_devm_qcom_scm_pas_context_alloc = (devm_qcom_scm_pas_context_alloc_t)
 		__symbol_get("devm_qcom_scm_pas_context_alloc");
 
 	if (!fn_devm_qcom_scm_pas_context_alloc) {
 		CAM_ERR(CAM_ICP,
 				"SCM PAS context alloc symbol not available");
-		return -EOPNOTSUPP;
-	}
-
-	fw->ctx = fn_devm_qcom_scm_pas_context_alloc
-		(&pdev->dev, fw_pas_id, res_start, res_size);
-	if (IS_ERR_OR_NULL(fw->ctx)) {
-		rc = fw->ctx ? PTR_ERR(fw->ctx) : -ENOMEM;
-		CAM_ERR(CAM_ICP, "PAS context alloc failed rc=%d", rc);
-		fw->ctx = NULL;
+		rc = -EOPNOTSUPP;
 		goto out;
 	}
 
-	cam_qcom_pas_ctx_set_use_tzmem(fw->ctx, fw->has_el2_iommu);
+	core_info->fw->ctx = fn_devm_qcom_scm_pas_context_alloc
+		(&pdev->dev, fw_pas_id, res_start, res_size);
+#endif
+	if (IS_ERR_OR_NULL(core_info->fw->ctx)) {
+		rc = core_info->fw->ctx ? PTR_ERR(core_info->fw->ctx) : -ENOMEM;
+		CAM_ERR(CAM_ICP, "PAS context alloc failed rc=%d", rc);
+		core_info->fw->ctx = NULL;
+		goto out;
+	}
+
+	cam_qcom_pas_ctx_set_use_tzmem(core_info->fw->ctx, core_info->fw->has_el2_iommu);
 
 	fn_qcom_mdt_pas_load = (qcom_mdt_pas_load_t)__symbol_get("qcom_mdt_pas_load");
 	if (!fn_qcom_mdt_pas_load) {
@@ -706,23 +737,44 @@ static int __load_firmware(struct platform_device *pdev,
 		return -EOPNOTSUPP;
 	}
 
-	rc = fn_qcom_mdt_pas_load(fw->ctx, firmware, firmware_name, NULL);
+	rc = fn_qcom_mdt_pas_load(core_info->fw->ctx, core_info->fw_cache.fw,
+		core_info->fw_name, NULL);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "failed to load firmware rc=%d", rc);
-		fw->ctx = NULL;
+		core_info->fw->ctx = NULL;
 		goto out;
 	}
 
-	fw->mem_phys = res_start;
-	fw->mem_size = res_size;
+	core_info->fw->mem_phys = res_start;
+	core_info->fw->mem_size = res_size;
 
 	CAM_DBG(CAM_ICP, "res_start=0x%x, res_size=%zu", res_start, res_size);
+	core_info->fw_cache.loaded = true;
+
 out:
+	if (core_info->fw->ctx) {
+#if IS_ENABLED(CONFIG_QCOM_PAS)
+		qcom_pas_metadata_release((struct qcom_pas_context *)core_info->fw->ctx);
+#else
+		fn_qcom_scm_pas_metadata_release =
+			(qcom_scm_pas_metadata_release_t)
+			__symbol_get("qcom_scm_pas_metadata_release");
+		if (!fn_qcom_scm_pas_metadata_release)
+			CAM_ERR(CAM_ICP, "qcom_scm_pas_metadata_release symbol not available");
+		else {
+			fn_qcom_scm_pas_metadata_release(core_info->fw->ctx);
+			symbol_put_addr(fn_qcom_scm_pas_metadata_release);
+		}
+#endif
+	}
 	if (fn_devm_qcom_scm_pas_context_alloc)
 		symbol_put_addr(fn_devm_qcom_scm_pas_context_alloc);
 	if (fn_qcom_mdt_pas_load)
 		symbol_put_addr(fn_qcom_mdt_pas_load);
-	release_firmware(firmware);
+	if (rc && core_info->fw_cache.fw && !core_info->fw_cache.loaded) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+	}
 	return rc;
 }
 #endif
@@ -757,7 +809,7 @@ static int cam_icp_v2_boot(struct cam_hw_info *icp_v2_info,
 
 #if IS_REACHABLE(CONFIG_QCOM_MDT_LOADER)
 	rc = __load_firmware(icp_v2_info->soc_info.pdev,
-			soc_priv->fw_pas_id, core_info->fw);
+		soc_priv->fw_pas_id, core_info);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "firmware loading failed rc=%d", rc);
 		goto err;
@@ -777,6 +829,9 @@ static int cam_icp_v2_boot(struct cam_hw_info *icp_v2_info,
 		core_info->fw->mem_size = 0;
 	}
 
+#if IS_ENABLED(CONFIG_QCOM_PAS)
+	rc = qcom_pas_prepare_and_auth_reset((struct qcom_pas_context *)core_info->fw->ctx);
+#else
 	fn_prepare_and_auth = (qcom_scm_pas_prepare_and_auth_reset_t)
 		__symbol_get("qcom_scm_pas_prepare_and_auth_reset");
 
@@ -786,6 +841,7 @@ static int cam_icp_v2_boot(struct cam_hw_info *icp_v2_info,
 	}
 
 	rc = fn_prepare_and_auth(core_info->fw->ctx);
+#endif
 	if (rc) {
 		CAM_ERR(CAM_ICP, "auth and reset failed rc=%d", rc);
 		goto err;
@@ -813,7 +869,11 @@ static int cam_icp_v2_shutdown(struct cam_hw_info *icp_v2_info)
 	prepare_shutdown(icp_v2_info);
 
 	if (core_info->use_sec_pil) {
+#if IS_ENABLED(CONFIG_QCOM_PAS)
+		rc = qcom_pas_shutdown(soc_priv->fw_pas_id);
+#else
 		rc = qcom_scm_pas_shutdown(soc_priv->fw_pas_id);
+#endif
 		if (core_info->fw->has_el2_iommu)
 			iommu_unmap(core_info->fw->iommu_domain, 0,
 				core_info->fw->mem_size);
@@ -884,7 +944,11 @@ static int cam_icp_v2_core_control(struct cam_hw_info *icp_v2_info,
 		(struct cam_icp_soc_info *)icp_v2_info->soc_info.soc_private;
 
 	if (core_info->use_sec_pil) {
+#if IS_ENABLED(CONFIG_QCOM_PAS)
+		rc = qcom_pas_set_remote_state(state, soc_priv->fw_pas_id);
+#else
 		rc = qcom_scm_set_remote_state(state, soc_priv->fw_pas_id);
+#endif
 		if (rc) {
 			CAM_ERR(CAM_ICP,
 				"remote state set to %s failed rc=%d",

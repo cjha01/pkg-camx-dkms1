@@ -113,6 +113,7 @@ struct cam_vfe_bus_ver3_common_data {
 	bool                                        is_lite;
 	bool                                        hw_init;
 	bool                                        support_consumed_addr;
+	bool                                        support_burst_limit;
 	bool                                        disable_ubwc_comp;
 	bool                                        init_irq_subscribed;
 	bool                                        disable_mmu_prefetch;
@@ -120,6 +121,24 @@ struct cam_vfe_bus_ver3_common_data {
 	int                        rup_irq_handle[CAM_VFE_BUS_VER3_SRC_GRP_MAX];
 	uint32_t                                    pack_align_shift;
 	uint32_t                                    max_bw_counter_limit;
+};
+
+struct cam_vfe_bus_ver3_wm_ubwc_cfg_data {
+	bool                 ubwc_updated;
+	uint32_t             ubwc_meta_addr;
+	uint32_t             ubwc_meta_cfg;
+	uint32_t             ubwc_mode_cfg;
+	uint32_t             ubwc_stats_ctrl;
+	uint32_t             ubwc_ctrl_2;
+	uint32_t             ubwc_lossy_threshold_0;
+	uint32_t             ubwc_lossy_threshold_1;
+	uint32_t             ubwc_offset_lossy_variance;
+	uint32_t             ubwc_bandwidth_limit;
+};
+
+struct cam_vfe_bus_ver3_wm_mc_data {
+	bool                                     init_cfg_done;
+	struct cam_vfe_bus_ver3_wm_ubwc_cfg_data ubwc_cfg_data;
 };
 
 struct cam_vfe_bus_ver3_wm_resource_data {
@@ -140,14 +159,10 @@ struct cam_vfe_bus_ver3_wm_resource_data {
 	uint32_t             burst_len;
 
 	uint32_t             en_ubwc;
-	bool                 ubwc_updated;
+	struct cam_vfe_bus_ver3_wm_ubwc_cfg_data ubwc_cfg_data;
+
 	uint32_t             packer_cfg;
 	uint32_t             h_init;
-	uint32_t             ubwc_meta_addr;
-	uint32_t             ubwc_meta_cfg;
-	uint32_t             ubwc_mode_cfg;
-	uint32_t             ubwc_stats_ctrl;
-	uint32_t             ubwc_ctrl_2;
 
 	uint32_t             irq_subsample_period;
 	uint32_t             irq_subsample_pattern;
@@ -157,10 +172,6 @@ struct cam_vfe_bus_ver3_wm_resource_data {
 	uint32_t             en_cfg;
 	uint32_t             is_dual;
 
-	uint32_t             ubwc_lossy_threshold_0;
-	uint32_t             ubwc_lossy_threshold_1;
-	uint32_t             ubwc_offset_lossy_variance;
-	uint32_t             ubwc_bandwidth_limit;
 	uint32_t             acquired_width;
 	uint32_t             acquired_height;
 	uint32_t             default_line_based;
@@ -168,6 +179,8 @@ struct cam_vfe_bus_ver3_wm_resource_data {
 	bool                 update_wm_format;
 	uint32_t             num_planes;
 	enum cam_vfe_bus_wr_wm_mode wm_mode;
+	struct cam_vfe_bus_ver3_vfe_out_data *out_rsrc_data;
+	struct cam_vfe_bus_ver3_wm_mc_data    *mc_data;
 };
 
 struct cam_vfe_bus_ver3_comp_grp_data {
@@ -223,6 +236,7 @@ struct cam_vfe_bus_ver3_vfe_out_data {
 	bool                             limiter_enabled;
 	bool                             mc_based;
 	bool                             cntxt_cfg_except;
+	bool                             per_port_en;
 	uint32_t                         dst_hw_ctxt_id_mask;
 	uint64_t                         pid_mask;
 	uint32_t   stored_irq_masks[CAM_VFE_BUS_VER3_MAX_STORED_MASKS][CAM_VFE_BUS_VER3_IRQ_MAX];
@@ -262,7 +276,8 @@ static int cam_vfe_bus_ver3_process_cmd(
 	uint32_t cmd_type, void *cmd_args, uint32_t arg_size);
 
 static int cam_vfe_bus_ver3_config_ubwc_regs(
-	struct cam_vfe_bus_ver3_wm_resource_data *wm_data);
+	struct cam_vfe_bus_ver3_wm_resource_data *wm_data,
+	struct cam_vfe_bus_ver3_wm_ubwc_cfg_data *ubwc_cfg_data);
 
 static int cam_vfe_bus_ver3_get_num_wm(
 	struct cam_vfe_bus_ver3_vfe_out_data *rsrc_data)
@@ -346,6 +361,7 @@ static bool cam_vfe_bus_ver3_can_be_secure(uint32_t out_type)
 {
 	switch (out_type) {
 	case CAM_VFE_BUS_VER3_VFE_OUT_FULL:
+	case CAM_VFE_BUS_VER3_VFE_OUT_DS2:
 	case CAM_VFE_BUS_VER3_VFE_OUT_DS4:
 	case CAM_VFE_BUS_VER3_VFE_OUT_DS16:
 	case CAM_VFE_BUS_VER3_VFE_OUT_RAW_DUMP:
@@ -365,6 +381,12 @@ static bool cam_vfe_bus_ver3_can_be_secure(uint32_t out_type)
 	case CAM_VFE_BUS_VER3_VFE_OUT_PREPROCESS_RAW:
 	case CAM_VFE_BUS_VER3_VFE_OUT_RDI4:
 	case CAM_VFE_BUS_VER3_VFE_OUT_RDI5:
+	case CAM_VFE_BUS_VER3_VFE_OUT_RDI6:
+	case CAM_VFE_BUS_VER3_VFE_OUT_RDI7:
+	case CAM_VFE_BUS_VER3_VFE_OUT_RDI8:
+	case CAM_VFE_BUS_VER3_VFE_OUT_RDI9:
+	case CAM_VFE_BUS_VER3_VFE_OUT_RDI10:
+	case CAM_VFE_BUS_VER3_VFE_OUT_RDI11:
 	case CAM_VFE_BUS_VER3_VFE_OUT_AI_OUT_1:
 	case CAM_VFE_BUS_VER3_VFE_OUT_AI_OUT_2:
 	case CAM_VFE_BUS_VER3_VFE_OUT_IR:
@@ -392,6 +414,9 @@ static bool cam_vfe_bus_ver3_can_be_secure(uint32_t out_type)
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_BG:
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BG:
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BHIST:
+	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_BG_IRC_AEC:
+	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_BHIST_IRC_AEC:
+	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BG:
 	default:
 		return false;
 	}
@@ -413,6 +438,9 @@ static enum cam_vfe_bus_ver3_vfe_out_type
 		break;
 	case CAM_ISP_IFE_OUT_RES_DS16:
 		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_DS16;
+		break;
+	case CAM_ISP_IFE_OUT_RES_DS2:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_DS2;
 		break;
 	case CAM_ISP_IFE_OUT_RES_FD:
 		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_FD;
@@ -492,6 +520,15 @@ static enum cam_vfe_bus_ver3_vfe_out_type
 	case CAM_ISP_IFE_OUT_RES_STATS_GTM_BHIST:
 		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_GTM_BHIST;
 		break;
+	case CAM_ISP_IFE_OUT_RES_STATS_TMC_BHIST:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_TMC_BHIST;
+		break;
+	case CAM_ISP_IFE_OUT_RES_STATS_AF_BHIST:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_AF_BHIST;
+		break;
+	case CAM_ISP_IFE_OUT_RES_STATS_AEC_BHIST:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BHIST;
+		break;
 	case CAM_ISP_IFE_LITE_OUT_RES_STATS_BG:
 		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_BG;
 		break;
@@ -516,6 +553,24 @@ static enum cam_vfe_bus_ver3_vfe_out_type
 	case CAM_ISP_IFE_OUT_RES_RDI_5:
 		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_RDI5;
 		break;
+	case CAM_ISP_IFE_OUT_RES_RDI_6:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_RDI6;
+		break;
+	case CAM_ISP_IFE_OUT_RES_RDI_7:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_RDI7;
+		break;
+	case CAM_ISP_IFE_OUT_RES_RDI_8:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_RDI8;
+		break;
+	case CAM_ISP_IFE_OUT_RES_RDI_9:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_RDI9;
+		break;
+	case CAM_ISP_IFE_OUT_RES_RDI_10:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_RDI10;
+		break;
+	case CAM_ISP_IFE_OUT_RES_RDI_11:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_RDI11;
+		break;
 	case CAM_ISP_IFE_OUT_RES_AI_OUT_1:
 		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_AI_OUT_1;
 		break;
@@ -530,6 +585,15 @@ static enum cam_vfe_bus_ver3_vfe_out_type
 		break;
 	case CAM_ISP_IFE_OUT_RES_STATS_IR_BHIST:
 		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BHIST;
+		break;
+	case CAM_ISP_IFE_OUT_RES_STATS_BG_IRC_AEC:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_BG_IRC_AEC;
+		break;
+	case CAM_ISP_IFE_OUT_RES_STATS_BHIST_IRC_AEC:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_BHIST_IRC_AEC;
+		break;
+	case CAM_ISP_IFE_OUT_RES_STATS_AEC_BG:
+		vfe_out_type = CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BG;
 		break;
 	default:
 		CAM_WARN(CAM_ISP, "VFE:%u Invalid isp res id: %d , assigning max",
@@ -597,6 +661,9 @@ static enum cam_vfe_bus_ver3_packer_format
 		return PACKER_FMT_VER3_PLAIN_64;
 	case CAM_FORMAT_UBWC_TP10:
 	case CAM_FORMAT_TP10:
+	case CAM_FORMAT_GBR_UBWC_TP10:
+	case CAM_FORMAT_BAYER_UBWC_TP10:
+	case CAM_FORMAT_GBR_TP10:
 		return PACKER_FMT_VER3_TP_10;
 	default:
 		return PACKER_FMT_VER3_MAX;
@@ -986,8 +1053,15 @@ static int cam_vfe_bus_ver3_res_update_config_wm(
 
 	rsrc_data = wm_res->res_priv;
 
+	if (rsrc_data->hw_regs->supported_formats &&
+		!(rsrc_data->hw_regs->supported_formats & BIT_ULL(rsrc_data->format))) {
+		CAM_ERR(CAM_ISP, "VFE:%u Invalid format %d out_type:%d",
+			wm_res->hw_intf->hw_idx, rsrc_data->format, vfe_out_res_id);
+		return -EINVAL;
+	}
+
 	if (((vfe_out_res_id >= CAM_VFE_BUS_VER3_VFE_OUT_RDI0) &&
-		(vfe_out_res_id <= CAM_VFE_BUS_VER3_VFE_OUT_RDI5))) {
+		(vfe_out_res_id <= CAM_VFE_BUS_VER3_VFE_OUT_RDI11))) {
 		if (rsrc_data->default_line_based)
 			rsrc_data->wm_mode = CAM_VFE_WM_LINE_BASED_MODE;
 		else
@@ -1009,57 +1083,32 @@ static int cam_vfe_bus_ver3_res_update_config_wm(
 		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_AI_OUT_1) ||
 		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_AI_OUT_2) ||
 		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_FD) ||
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_DS2) ||
 		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_FULL_DISP)) {
 
 		switch (rsrc_data->format) {
 		case CAM_FORMAT_UBWC_NV12_4R:
-			rsrc_data->en_ubwc = 1;
-			switch (plane) {
-			case PLANE_C:
-				rsrc_data->height /= 2;
-				break;
-			case PLANE_Y:
-				break;
-			default:
-				CAM_ERR(CAM_ISP, "VFE:%u Invalid plane %d",
-					wm_res->hw_intf->hw_idx, plane);
-				return -EINVAL;
-			}
-			break;
 		case CAM_FORMAT_UBWC_NV12:
+		case CAM_FORMAT_UBWC_TP10:
+		case CAM_FORMAT_UBWC_P016:
+		case CAM_FORMAT_GBR_UBWC_TP10:
+		case CAM_FORMAT_BAYER_UBWC_TP10:
 			rsrc_data->en_ubwc = 1;
 			fallthrough;
-			/* Fall through for NV12 */
+			/* plain and MIPI formats also supported */
+		case CAM_FORMAT_PLAIN16_10:
+		case CAM_FORMAT_PLAIN16_12:
+		case CAM_FORMAT_PLAIN16_14:
+		case CAM_FORMAT_PLAIN16_16:
+		case CAM_FORMAT_MIPI_RAW_10:
+		case CAM_FORMAT_MIPI_RAW_12:
+		case CAM_FORMAT_MIPI_RAW_14:
+		case CAM_FORMAT_PLAIN8:
 		case CAM_FORMAT_NV21:
 		case CAM_FORMAT_NV12:
 		case CAM_FORMAT_Y_ONLY:
-			switch (plane) {
-			case PLANE_C:
-				rsrc_data->height /= 2;
-				break;
-			case PLANE_Y:
-				break;
-			default:
-				CAM_ERR(CAM_ISP, "VFE:%u Invalid plane %d",
-					wm_res->hw_intf->hw_idx, plane);
-				return -EINVAL;
-			}
-			break;
-		case CAM_FORMAT_UBWC_TP10:
-			rsrc_data->en_ubwc = 1;
-			switch (plane) {
-			case PLANE_C:
-				rsrc_data->height /= 2;
-				break;
-			case PLANE_Y:
-				break;
-			default:
-				CAM_ERR(CAM_ISP, "VFE:%u Invalid plane %d",
-					wm_res->hw_intf->hw_idx, plane);
-				return -EINVAL;
-			}
-			break;
 		case CAM_FORMAT_TP10:
+		case CAM_FORMAT_GBR_TP10:
 			switch (plane) {
 			case PLANE_C:
 				rsrc_data->height /= 2;
@@ -1072,18 +1121,9 @@ static int cam_vfe_bus_ver3_res_update_config_wm(
 				return -EINVAL;
 			}
 			break;
-		case CAM_FORMAT_PLAIN16_10:
-			switch (plane) {
-			case PLANE_C:
-				rsrc_data->height /= 2;
-				break;
-			case PLANE_Y:
-				break;
-			default:
-				CAM_ERR(CAM_ISP, "VFE:%u Invalid plane %d",
-					wm_res->hw_intf->hw_idx, plane);
-				return -EINVAL;
-			}
+		case CAM_FORMAT_PD10:
+			rsrc_data->width /= 2;
+			rsrc_data->height /= 2;
 			break;
 		default:
 			if (wm_res->is_per_port_acquire) {
@@ -1236,7 +1276,13 @@ static int cam_vfe_bus_ver3_res_update_config_wm(
 	} else if ((vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BE) ||
 		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_GTM_BHIST) ||
 		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BHIST)  ||
-		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BG)) {
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_IR_BG) ||
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_TMC_BHIST) ||
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_AF_BHIST) ||
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_BG_IRC_AEC) ||
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_BHIST_IRC_AEC) ||
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BG) ||
+		(vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BHIST)) {
 		rsrc_data->width = 0;
 		rsrc_data->height = 0;
 		rsrc_data->stride = 1;
@@ -1455,21 +1501,16 @@ static int cam_vfe_bus_ver3_release_wm(void   *bus_priv,
 	rsrc_data->packer_cfg = 0;
 	rsrc_data->en_ubwc = 0;
 	rsrc_data->h_init = 0;
-	rsrc_data->ubwc_meta_addr = 0;
-	rsrc_data->ubwc_meta_cfg = 0;
-	rsrc_data->ubwc_mode_cfg = 0;
-	rsrc_data->ubwc_stats_ctrl = 0;
-	rsrc_data->ubwc_ctrl_2 = 0;
 	rsrc_data->init_cfg_done = false;
 	rsrc_data->hfr_cfg_done = false;
-	rsrc_data->ubwc_updated = false;
 	rsrc_data->en_cfg = 0;
 	rsrc_data->is_dual = 0;
+	memset(&rsrc_data->ubwc_cfg_data, 0, sizeof(struct cam_vfe_bus_ver3_wm_ubwc_cfg_data));
 
-	rsrc_data->ubwc_lossy_threshold_0 = 0;
-	rsrc_data->ubwc_lossy_threshold_1 = 0;
-	rsrc_data->ubwc_offset_lossy_variance = 0;
-	rsrc_data->ubwc_bandwidth_limit = 0;
+	if (rsrc_data->out_rsrc_data->mc_based || rsrc_data->out_rsrc_data->cntxt_cfg_except)
+		memset(rsrc_data->mc_data, 0, sizeof(struct cam_vfe_bus_ver3_wm_mc_data) *
+			CAM_ISP_MULTI_CTXT_MAX);
+
 	wm_res->tasklet_info = NULL;
 	wm_res->res_state = CAM_ISP_RESOURCE_STATE_AVAILABLE;
 
@@ -1480,21 +1521,18 @@ static int cam_vfe_bus_ver3_release_wm(void   *bus_priv,
 	return 0;
 }
 
-static int cam_vfe_bus_ver3_start_wm(struct cam_isp_resource_node *wm_res)
+static int cam_vfe_bus_ver3_start_wm_util(
+	struct cam_vfe_bus_ver3_wm_resource_data   *rsrc_data, int hw_ctxt_id)
 {
-	const uint32_t enable_debug_status_1 = 11 << 8;
 	int val = 0;
-	struct cam_vfe_bus_ver3_wm_resource_data   *rsrc_data =
-		wm_res->res_priv;
 	struct cam_vfe_bus_ver3_common_data        *common_data =
 		rsrc_data->common_data;
 	struct cam_vfe_bus_ver3_reg_offset_ubwc_client *ubwc_regs;
 	bool disable_ubwc_comp = rsrc_data->common_data->disable_ubwc_comp;
+	struct cam_vfe_bus_ver3_wm_ubwc_cfg_data *ubwc_cfg_data = NULL;
 
 	ubwc_regs = (struct cam_vfe_bus_ver3_reg_offset_ubwc_client *)
 		rsrc_data->hw_regs->ubwc_regs;
-
-	cam_io_w(0xf, common_data->mem_base + rsrc_data->hw_regs->burst_limit);
 
 	cam_io_w((rsrc_data->height << 16) | rsrc_data->width,
 		common_data->mem_base + rsrc_data->hw_regs->image_cfg_0);
@@ -1511,9 +1549,15 @@ static int cam_vfe_bus_ver3_start_wm(struct cam_isp_resource_node *wm_res)
 			return -EINVAL;
 		}
 
-		if (rsrc_data->ubwc_updated) {
-			cam_vfe_bus_ver3_config_ubwc_regs(rsrc_data);
-			rsrc_data->ubwc_updated = false;
+		if ((rsrc_data->out_rsrc_data->mc_based ||
+			rsrc_data->out_rsrc_data->cntxt_cfg_except) && rsrc_data->mc_data)
+			ubwc_cfg_data = &rsrc_data->mc_data[hw_ctxt_id].ubwc_cfg_data;
+		else
+			ubwc_cfg_data = &rsrc_data->ubwc_cfg_data;
+
+		if (ubwc_cfg_data->ubwc_updated) {
+			cam_vfe_bus_ver3_config_ubwc_regs(rsrc_data, ubwc_cfg_data);
+			ubwc_cfg_data->ubwc_updated = false;
 		}
 
 		val = cam_io_r_mb(common_data->mem_base + ubwc_regs->mode_cfg);
@@ -1525,6 +1569,7 @@ static int cam_vfe_bus_ver3_start_wm(struct cam_isp_resource_node *wm_res)
 				rsrc_data->common_data->core_index,
 				rsrc_data->index, val);
 		}
+
 		cam_io_w_mb(val, common_data->mem_base + ubwc_regs->mode_cfg);
 	}
 
@@ -1540,9 +1585,72 @@ static int cam_vfe_bus_ver3_start_wm(struct cam_isp_resource_node *wm_res)
 			rsrc_data->index);
 	}
 
+	if (rsrc_data->out_rsrc_data &&
+		(rsrc_data->out_rsrc_data->mc_based ||
+		rsrc_data->out_rsrc_data->cntxt_cfg_except))
+		cam_io_w_mb(rsrc_data->out_rsrc_data->dst_hw_ctxt_id_mask,
+			common_data->mem_base + rsrc_data->hw_regs->ctxt_cfg);
+
 	/* Enable WM */
 	cam_io_w_mb(rsrc_data->en_cfg, common_data->mem_base +
 		rsrc_data->hw_regs->cfg);
+
+	return 0;
+}
+
+static int cam_vfe_bus_ver3_start_wm(struct cam_isp_resource_node *wm_res)
+{
+	const uint32_t enable_debug_status_1 = 11 << 8;
+	int i, rc = 0;
+	struct cam_vfe_bus_ver3_wm_resource_data   *rsrc_data =
+		wm_res->res_priv;
+	struct cam_vfe_bus_ver3_common_data        *common_data =
+		rsrc_data->common_data;
+
+	if (common_data->support_burst_limit)
+		cam_io_w(0xf, common_data->mem_base + rsrc_data->hw_regs->burst_limit);
+
+	if (rsrc_data->out_rsrc_data &&
+		(rsrc_data->out_rsrc_data->mc_based ||
+		rsrc_data->out_rsrc_data->cntxt_cfg_except)) {
+		for (i = 0; i < CAM_ISP_MULTI_CTXT_MAX; i++) {
+			uint32_t ctxt_sel_val = i << common_data->common_reg->mc_write_sel_shift;
+
+			if (!(rsrc_data->out_rsrc_data->dst_hw_ctxt_id_mask & BIT(i)))
+				continue;
+
+			/*
+			 * Program reg context select before programming multibank registers.
+			 * start_wm_util() reads back banked registers (e.g. UBWC mode_cfg) for
+			 * this context, so the read-select bank must also be pointed at ctxt i -
+			 * either via a dedicated ctxt_rd_sel register or via read-select bits
+			 * packed into this same ctxt_sel write, since the latter would
+			 * otherwise be left at bank 0 by a write-select-only write.
+			 */
+			if (common_data->common_reg->ctxt_rd_sel)
+				cam_io_w_mb(i, common_data->mem_base +
+					common_data->common_reg->ctxt_rd_sel);
+			else
+				ctxt_sel_val |= i << common_data->common_reg->mc_read_sel_shift;
+
+			cam_io_w_mb(ctxt_sel_val,
+				common_data->mem_base + common_data->common_reg->ctxt_sel);
+			rc = cam_vfe_bus_ver3_start_wm_util(rsrc_data, i);
+			if (rc) {
+				CAM_ERR(CAM_ISP,
+					"VFE:%u Failed in configuring WM:%s hw_ctxt:%d for start",
+					rsrc_data->common_data->core_index, wm_res->res_name, i);
+				goto end;
+			}
+		}
+	} else {
+		rc = cam_vfe_bus_ver3_start_wm_util(rsrc_data, -1);
+		if (rc) {
+			CAM_ERR(CAM_ISP, "VFE:%u Failed in configuring WM:%s for start",
+				rsrc_data->common_data->core_index, wm_res->res_name);
+			goto end;
+		}
+	}
 
 	/* Enable constraint error detection */
 	cam_io_w_mb(enable_debug_status_1,
@@ -1554,33 +1662,65 @@ static int cam_vfe_bus_ver3_start_wm(struct cam_isp_resource_node *wm_res)
 		rsrc_data->common_data->core_index, rsrc_data->index,
 		wm_res->res_name, (uint32_t) rsrc_data->hw_regs->cfg,
 		rsrc_data->en_cfg, rsrc_data->width, rsrc_data->height);
-	CAM_DBG(CAM_ISP, "VFE:%u WM:%d pk_fmt:%d stride:%d burst len:%d",
+	CAM_DBG(CAM_ISP, "VFE:%u WM:%d pk_fmt:%d stride:%d burst len:%d hw_ctxt_mask:0x%x",
 		rsrc_data->common_data->core_index, rsrc_data->index, rsrc_data->pack_fmt,
-		rsrc_data->stride, 0xF);
+		rsrc_data->stride, 0xF,
+		rsrc_data->out_rsrc_data ? rsrc_data->out_rsrc_data->dst_hw_ctxt_id_mask : 0);
 
 	wm_res->res_state = CAM_ISP_RESOURCE_STATE_STREAMING;
 
-	return 0;
+end:
+	return rc;
+}
+
+static inline void cam_vfe_bus_ver3_stop_wm_util(
+	struct cam_vfe_bus_ver3_wm_resource_data   *rsrc_data)
+{
+	/* Disable WM */
+	cam_io_w_mb(0x0, rsrc_data->common_data->mem_base + rsrc_data->hw_regs->cfg);
 }
 
 static int cam_vfe_bus_ver3_stop_wm(struct cam_isp_resource_node *wm_res)
 {
 	struct cam_vfe_bus_ver3_wm_resource_data   *rsrc_data =
 		wm_res->res_priv;
-	struct cam_vfe_bus_ver3_common_data        *common_data =
-		rsrc_data->common_data;
+	int i;
 
-	/* Disable WM */
-	cam_io_w_mb(0x0, common_data->mem_base + rsrc_data->hw_regs->cfg);
-	CAM_DBG(CAM_ISP, "Stop VFE:%u WM:%d %s",
+	if (rsrc_data->out_rsrc_data &&
+		(rsrc_data->out_rsrc_data->mc_based ||
+		rsrc_data->out_rsrc_data->cntxt_cfg_except)) {
+		for (i = 0; i < CAM_ISP_MULTI_CTXT_MAX; i++) {
+			if (!(rsrc_data->out_rsrc_data->dst_hw_ctxt_id_mask & BIT(i)))
+				continue;
+
+			cam_io_w_mb(i << rsrc_data->common_data->common_reg->mc_write_sel_shift,
+				rsrc_data->common_data->mem_base +
+				rsrc_data->common_data->common_reg->ctxt_sel);
+			cam_vfe_bus_ver3_stop_wm_util(rsrc_data);
+		}
+	} else {
+		cam_vfe_bus_ver3_stop_wm_util(rsrc_data);
+	}
+
+	CAM_DBG(CAM_ISP, "Stop VFE:%u WM:%d %s hw_ctxt_mask:0x%x",
 		rsrc_data->common_data->core_index, rsrc_data->index,
-		wm_res->res_name);
+		wm_res->res_name,
+		rsrc_data->out_rsrc_data ? rsrc_data->out_rsrc_data->dst_hw_ctxt_id_mask : 0);
 
 	wm_res->res_state = CAM_ISP_RESOURCE_STATE_RESERVED;
 	rsrc_data->init_cfg_done = false;
 	rsrc_data->hfr_cfg_done = false;
-	rsrc_data->ubwc_updated = false;
+	rsrc_data->ubwc_cfg_data.ubwc_updated = false;
 	rsrc_data->update_wm_format = false;
+
+	if (rsrc_data->out_rsrc_data &&
+		(rsrc_data->out_rsrc_data->mc_based ||
+		rsrc_data->out_rsrc_data->cntxt_cfg_except)) {
+		for (i = 0; i < CAM_ISP_MULTI_CTXT_MAX; i++) {
+			rsrc_data->mc_data[i].init_cfg_done = false;
+			rsrc_data->mc_data[i].ubwc_cfg_data.ubwc_updated = false;
+		}
+	}
 
 	return 0;
 }
@@ -1604,7 +1744,8 @@ static int cam_vfe_bus_ver3_init_wm_resource(uint32_t index,
 	struct cam_isp_resource_node    **comp_grp,
 	uint8_t                         *wm_name,
 	uint32_t                         line_based_config,
-	uint32_t                         num_wm)
+	uint32_t                         num_wm,
+	struct cam_vfe_bus_ver3_vfe_out_data *out_rsrc_data)
 {
 	struct cam_vfe_bus_ver3_wm_resource_data *rsrc_data;
 
@@ -1615,6 +1756,18 @@ static int cam_vfe_bus_ver3_init_wm_resource(uint32_t index,
 			ver3_bus_priv->common_data.hw_intf->hw_idx);
 		return -ENOMEM;
 	}
+
+	if (out_rsrc_data->mc_based || out_rsrc_data->cntxt_cfg_except) {
+		rsrc_data->mc_data = kcalloc(CAM_ISP_MULTI_CTXT_MAX,
+			sizeof(struct cam_vfe_bus_ver3_wm_mc_data), GFP_KERNEL);
+		if (!rsrc_data->mc_data) {
+			CAM_ERR(CAM_ISP, "VFE:%u Failed to alloc for WM res mc data",
+				ver3_bus_priv->common_data.hw_intf->hw_idx);
+			kfree(rsrc_data);
+			return -ENOMEM;
+		}
+	}
+
 	wm_res->res_priv = rsrc_data;
 
 	rsrc_data->index = index;
@@ -1622,6 +1775,7 @@ static int cam_vfe_bus_ver3_init_wm_resource(uint32_t index,
 	rsrc_data->hw_regs = &ver3_hw_info->bus_client_reg[index];
 	rsrc_data->common_data = &ver3_bus_priv->common_data;
 	rsrc_data->num_planes = num_wm;
+	rsrc_data->out_rsrc_data = out_rsrc_data;
 	*comp_grp = &ver3_bus_priv->comp_grp[(&ver3_hw_info->bus_client_reg[index])->comp_group];
 	wm_res->res_state = CAM_ISP_RESOURCE_STATE_AVAILABLE;
 	INIT_LIST_HEAD(&wm_res->list);
@@ -1657,6 +1811,14 @@ static int cam_vfe_bus_ver3_deinit_wm_resource(
 	wm_res->res_priv = NULL;
 	if (!rsrc_data)
 		return -ENOMEM;
+
+	if (rsrc_data->out_rsrc_data &&
+		(rsrc_data->out_rsrc_data->mc_based ||
+		rsrc_data->out_rsrc_data->cntxt_cfg_except)) {
+		kfree(rsrc_data->mc_data);
+		rsrc_data->mc_data = NULL;
+	}
+
 	kfree(rsrc_data);
 
 	return 0;
@@ -1799,7 +1961,7 @@ static int cam_vfe_bus_ver3_start_comp_grp(
 	struct cam_vfe_bus_ver3_common_data *common_data = rsrc_data->common_data;
 
 	CAM_DBG(CAM_ISP,
-		"Start VFE:%u comp_grp:%d streaming state:%d comp_mask:0x%X",
+		"Start VFE:%u comp_grp:%d streaming state:%d comp_mask:0x%lX",
 		rsrc_data->common_data->core_index,
 		rsrc_data->comp_grp_type, comp_grp->res_state,
 		rsrc_data->composite_mask);
@@ -2187,6 +2349,8 @@ static int cam_vfe_bus_ver3_update_acquire_vfe_out(void *bus_priv, void *acquire
 
 	rsrc_data->is_dual = out_acquire_args->is_dual;
 	rsrc_data->is_master = out_acquire_args->is_master;
+	rsrc_data->per_port_en = is_per_port_acquire;
+
 	if (!update_only)
 		rsrc_node->res_state = CAM_ISP_RESOURCE_STATE_RESERVED;
 	rsrc_node->is_per_port_acquire = is_per_port_acquire;
@@ -2236,6 +2400,7 @@ static int cam_vfe_bus_ver3_release_vfe_out(void *bus_priv, void *release_args,
 			vfe_out->res_id);
 	}
 
+	rsrc_data->per_port_en = false;
 	num_wm = cam_vfe_bus_ver3_get_num_wm(rsrc_data);
 	for (i = 0; i < num_wm; i++)
 		cam_vfe_bus_ver3_release_wm(bus_priv, &rsrc_data->wm_res[i]);
@@ -2339,7 +2504,8 @@ static int cam_vfe_bus_ver3_start_vfe_out(
 		rsrc_data->stored_irq_masks[CAM_VFE_BUS_VER3_BUF_DONE_MASK][CAM_VFE_BUS_VER3_IRQ_REG0],
 		rsrc_data->stored_irq_masks[CAM_VFE_BUS_VER3_BUF_DONE_MASK][CAM_VFE_BUS_VER3_IRQ_REG1]);
 
-	if (vfe_out->is_per_port_start) {
+	if (vfe_out->is_per_port_start ||
+		(!vfe_out->linked && rsrc_data->per_port_en)) {
 		CAM_DBG(CAM_ISP, "Skipping irq subscribe for resources that are not updated");
 		goto end;
 	}
@@ -2638,7 +2804,7 @@ static int cam_vfe_bus_ver3_init_vfe_out_resource(uint32_t  index,
 			&rsrc_data->comp_grp,
 			ver3_hw_info->vfe_out_hw_info[index].name[i],
 			ver3_hw_info->vfe_out_hw_info[index].line_based,
-			rsrc_data->num_wm);
+			rsrc_data->num_wm, rsrc_data);
 		if (rc < 0) {
 			CAM_ERR(CAM_ISP, "VFE:%u init WM:%d failed rc:%d",
 				ver3_bus_priv->common_data.core_index, i, rc);
@@ -2658,7 +2824,7 @@ static int cam_vfe_bus_ver3_init_vfe_out_resource(uint32_t  index,
 	vfe_out->hw_intf = ver3_bus_priv->common_data.hw_intf;
 	vfe_out->irq_handle = 0;
 
-	rsrc_data->num_mid = ver3_hw_info->vfe_out_hw_info->num_mid;
+	rsrc_data->num_mid = ver3_hw_info->vfe_out_hw_info[index].num_mid;
 	rsrc_data->mid = ver3_hw_info->vfe_out_hw_info[index].mid;
 
 	return 0;
@@ -3333,12 +3499,13 @@ end:
 
 static int cam_vfe_bus_ver3_update_ubwc_regs(
 	struct cam_vfe_bus_ver3_wm_resource_data *wm_data,
-	uint32_t *reg_val_pair,	uint32_t i, uint32_t *j)
+	struct cam_vfe_bus_ver3_wm_ubwc_cfg_data *ubwc_cfg_data,
+	uint32_t *reg_val_pair, uint32_t i, uint32_t *j)
 {
 	struct cam_vfe_bus_ver3_reg_offset_ubwc_client *ubwc_regs;
 	int rc = 0;
 
-	if (!wm_data || !reg_val_pair || !j) {
+	if (!wm_data || !ubwc_cfg_data || !reg_val_pair || !j) {
 		CAM_ERR(CAM_ISP, "Invalid args");
 		rc = -EINVAL;
 		goto end;
@@ -3353,39 +3520,39 @@ static int cam_vfe_bus_ver3_update_ubwc_regs(
 		wm_data->common_data->core_index, wm_data->index, reg_val_pair[*j-1]);
 
 	CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, *j,
-		ubwc_regs->meta_cfg, wm_data->ubwc_meta_cfg);
+		ubwc_regs->meta_cfg, ubwc_cfg_data->ubwc_meta_cfg);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d meta stride 0x%X",
 		wm_data->common_data->core_index, wm_data->index, reg_val_pair[*j-1]);
 
 	if (wm_data->common_data->disable_ubwc_comp) {
-		wm_data->ubwc_mode_cfg &= ~ubwc_regs->ubwc_comp_en_bit;
+		ubwc_cfg_data->ubwc_mode_cfg &= ~ubwc_regs->ubwc_comp_en_bit;
 		CAM_DBG(CAM_ISP,
 			"Force disable UBWC compression on VFE:%u WM:%d",
 			wm_data->common_data->core_index, wm_data->index);
 	}
 
 	CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, *j,
-		ubwc_regs->mode_cfg, wm_data->ubwc_mode_cfg);
+		ubwc_regs->mode_cfg, ubwc_cfg_data->ubwc_mode_cfg);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d ubwc_mode_cfg 0x%X",
 		 wm_data->common_data->core_index, wm_data->index, reg_val_pair[*j-1]);
 
 	CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, *j,
-		ubwc_regs->ctrl_2, wm_data->ubwc_ctrl_2);
+		ubwc_regs->ctrl_2, ubwc_cfg_data->ubwc_ctrl_2);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d ubwc_ctrl_2 0x%X",
 		wm_data->common_data->core_index, wm_data->index, reg_val_pair[*j-1]);
 
 	CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, *j,
-		ubwc_regs->lossy_thresh0, wm_data->ubwc_lossy_threshold_0);
+		ubwc_regs->lossy_thresh0, ubwc_cfg_data->ubwc_lossy_threshold_0);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d lossy_thresh0 0x%X",
 		wm_data->common_data->core_index, wm_data->index, reg_val_pair[*j-1]);
 
 	CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, *j,
-		ubwc_regs->lossy_thresh1, wm_data->ubwc_lossy_threshold_1);
+		ubwc_regs->lossy_thresh1, ubwc_cfg_data->ubwc_lossy_threshold_1);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d lossy_thresh1 0x%X",
 		wm_data->common_data->core_index, wm_data->index, reg_val_pair[*j-1]);
 
 	CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, *j,
-		ubwc_regs->off_lossy_var, wm_data->ubwc_offset_lossy_variance);
+		ubwc_regs->off_lossy_var, ubwc_cfg_data->ubwc_offset_lossy_variance);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d off_lossy_var 0x%X",
 		wm_data->common_data->core_index, wm_data->index, reg_val_pair[*j-1]);
 
@@ -3393,12 +3560,12 @@ static int cam_vfe_bus_ver3_update_ubwc_regs(
 	 * If limit value >= 0xFFFF, limit configured by
 	 * generic limiter blob
 	 */
-	if (wm_data->ubwc_bandwidth_limit < 0xFFFF) {
+	if (ubwc_cfg_data->ubwc_bandwidth_limit < 0xFFFF) {
 		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, *j,
-			ubwc_regs->bw_limit, wm_data->ubwc_bandwidth_limit);
+			ubwc_regs->bw_limit, ubwc_cfg_data->ubwc_bandwidth_limit);
 		CAM_DBG(CAM_ISP, "VFE:%u WM:%d ubwc bw limit 0x%X",
 			wm_data->common_data->core_index, wm_data->index,
-			wm_data->ubwc_bandwidth_limit);
+			ubwc_cfg_data->ubwc_bandwidth_limit);
 	}
 
 end:
@@ -3406,64 +3573,77 @@ end:
 }
 
 static int cam_vfe_bus_ver3_config_ubwc_regs(
-	struct cam_vfe_bus_ver3_wm_resource_data *wm_data)
+	struct cam_vfe_bus_ver3_wm_resource_data *wm_data,
+	struct cam_vfe_bus_ver3_wm_ubwc_cfg_data *ubwc_cfg_data)
 {
-	struct cam_vfe_bus_ver3_reg_offset_ubwc_client *ubwc_regs =
-		(struct cam_vfe_bus_ver3_reg_offset_ubwc_client *)
-		wm_data->hw_regs->ubwc_regs;
+	struct cam_vfe_bus_ver3_reg_offset_ubwc_client *ubwc_regs = NULL;
+
+
+	if (!wm_data || !ubwc_cfg_data) {
+		CAM_ERR(CAM_ISP, "Invalid args");
+		return -EINVAL;
+	}
+
+	ubwc_regs = (struct cam_vfe_bus_ver3_reg_offset_ubwc_client *) wm_data->hw_regs->ubwc_regs;
 
 	cam_io_w_mb(wm_data->packer_cfg, wm_data->common_data->mem_base +
 		wm_data->hw_regs->packer_cfg);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d packer cfg:0x%x",
 		wm_data->common_data->core_index, wm_data->index, wm_data->packer_cfg);
 
-	cam_io_w_mb(wm_data->ubwc_meta_cfg,
+	cam_io_w_mb(ubwc_cfg_data->ubwc_meta_cfg,
 		wm_data->common_data->mem_base + ubwc_regs->meta_cfg);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d meta stride:0x%x",
-		wm_data->common_data->core_index, wm_data->index, wm_data->ubwc_meta_cfg);
+		wm_data->common_data->core_index, wm_data->index,
+		ubwc_cfg_data->ubwc_meta_cfg);
 
 	if (wm_data->common_data->disable_ubwc_comp) {
-		wm_data->ubwc_mode_cfg &= ~ubwc_regs->ubwc_comp_en_bit;
+		ubwc_cfg_data->ubwc_mode_cfg &= ~ubwc_regs->ubwc_comp_en_bit;
 		CAM_DBG(CAM_ISP,
 			"Force disable UBWC compression on VFE:%u WM:%d",
 			wm_data->common_data->core_index, wm_data->index);
 	}
 
-	cam_io_w_mb(wm_data->ubwc_mode_cfg,
+	cam_io_w_mb(ubwc_cfg_data->ubwc_mode_cfg,
 		wm_data->common_data->mem_base + ubwc_regs->mode_cfg);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d ubwc_mode_cfg:0x%x",
-		wm_data->common_data->core_index, wm_data->index, wm_data->ubwc_mode_cfg);
+		wm_data->common_data->core_index, wm_data->index,
+		ubwc_cfg_data->ubwc_mode_cfg);
 
-	cam_io_w_mb(wm_data->ubwc_ctrl_2,
+	cam_io_w_mb(ubwc_cfg_data->ubwc_ctrl_2,
 		wm_data->common_data->mem_base + ubwc_regs->ctrl_2);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d ubwc_ctrl_2:0x%x",
-		wm_data->common_data->core_index, wm_data->index, wm_data->ubwc_ctrl_2);
+		wm_data->common_data->core_index, wm_data->index,
+		ubwc_cfg_data->ubwc_ctrl_2);
 
-	cam_io_w_mb(wm_data->ubwc_lossy_threshold_0,
+	cam_io_w_mb(ubwc_cfg_data->ubwc_lossy_threshold_0,
 		wm_data->common_data->mem_base + ubwc_regs->lossy_thresh0);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d lossy_thresh0: 0x%x",
-		wm_data->common_data->core_index, wm_data->index, wm_data->ubwc_lossy_threshold_0);
+		wm_data->common_data->core_index, wm_data->index,
+		ubwc_cfg_data->ubwc_lossy_threshold_0);
 
-	cam_io_w_mb(wm_data->ubwc_lossy_threshold_1,
+	cam_io_w_mb(ubwc_cfg_data->ubwc_lossy_threshold_1,
 		wm_data->common_data->mem_base + ubwc_regs->lossy_thresh1);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d lossy_thresh0:0x%x",
-		wm_data->common_data->core_index, wm_data->index, wm_data->ubwc_lossy_threshold_1);
+		wm_data->common_data->core_index, wm_data->index,
+		ubwc_cfg_data->ubwc_lossy_threshold_1);
 
-	cam_io_w_mb(wm_data->ubwc_offset_lossy_variance,
+	cam_io_w_mb(ubwc_cfg_data->ubwc_offset_lossy_variance,
 		wm_data->common_data->mem_base + ubwc_regs->off_lossy_var);
 	CAM_DBG(CAM_ISP, "VFE:%u WM:%d off_lossy_var:0x%x",
-	wm_data->common_data->core_index, wm_data->index, wm_data->ubwc_offset_lossy_variance);
+		wm_data->common_data->core_index, wm_data->index,
+		ubwc_cfg_data->ubwc_offset_lossy_variance);
 
 	/*
 	 * If limit value >= 0xFFFF, limit configured by
 	 * generic limiter blob
 	 */
-	if (wm_data->ubwc_bandwidth_limit < 0xFFFF) {
-		cam_io_w_mb(wm_data->ubwc_bandwidth_limit,
+	if (ubwc_cfg_data->ubwc_bandwidth_limit < 0xFFFF) {
+		cam_io_w_mb(ubwc_cfg_data->ubwc_bandwidth_limit,
 			wm_data->common_data->mem_base + ubwc_regs->bw_limit);
 		CAM_DBG(CAM_ISP, "VFE:%u WM:%d ubwc bw limit:0x%x",
 			wm_data->common_data->core_index, wm_data->index,
-			wm_data->ubwc_bandwidth_limit);
+			ubwc_cfg_data->ubwc_bandwidth_limit);
 	}
 
 	return 0;
@@ -3547,9 +3727,9 @@ static int cam_vfe_bus_ver3_config_wm(void *priv, void *cmd_args,
 				return -EINVAL;
 			}
 
-			if (wm_data->ubwc_updated) {
-				wm_data->ubwc_updated = false;
-				cam_vfe_bus_ver3_config_ubwc_regs(wm_data);
+			if (wm_data->ubwc_cfg_data.ubwc_updated) {
+				wm_data->ubwc_cfg_data.ubwc_updated = false;
+				cam_vfe_bus_ver3_config_ubwc_regs(wm_data, &wm_data->ubwc_cfg_data);
 			}
 
 			cam_io_w_mb(iova_addr, wm_data->common_data->mem_base +
@@ -3573,7 +3753,7 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 {
 	struct cam_isp_hw_get_cmd_update         *update_buf;
 	struct cam_vfe_bus_ver3_priv             *bus_priv;
-	struct cam_buf_io_cfg                    *io_cfg;
+	struct cam_buf_io_cfg                    *io_cfg = NULL;
 	struct cam_vfe_bus_ver3_vfe_out_data     *vfe_out_data = NULL;
 	struct cam_vfe_bus_ver3_wm_resource_data *wm_data = NULL;
 	struct cam_cdm_utils_ops                       *cdm_util_ops;
@@ -3584,6 +3764,7 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 	uint32_t iova_addr, iova_offset, image_buf_offset = 0, stride, slice_h;
 	dma_addr_t iova;
 	int rc = 0;
+	int hw_cntxt_id;
 
 	update_buf = (struct cam_isp_hw_get_cmd_update *) cmd_args;
 	bus_priv = (struct cam_vfe_bus_ver3_priv  *) priv;
@@ -3617,6 +3798,29 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 				bus_priv->common_data.core_index, vfe_out_data->out_type);
 	} else {
 		io_cfg = update_buf->wm_update->io_cfg;
+	}
+
+	if ((!update_buf->use_scratch_cfg) && (!io_cfg)) {
+		CAM_ERR(CAM_ISP, "Invalid io cfg for wm update");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	if ((vfe_out_data->mc_based || vfe_out_data->cntxt_cfg_except) &&
+		io_cfg && io_cfg->flag && (io_cfg->flag & (io_cfg->flag - 1))) {
+		CAM_ERR(CAM_ISP, "Invalid non-onehot hw context mask: 0x%x",
+			io_cfg->flag);
+		rc = -EINVAL;
+		goto end;
+	}
+	hw_cntxt_id = io_cfg && io_cfg->flag ? (ffs(io_cfg->flag) - 1) : -1;
+
+	if ((vfe_out_data->mc_based || vfe_out_data->cntxt_cfg_except) &&
+		(!io_cfg || !io_cfg->flag || (hw_cntxt_id < CAM_ISP_MULTI_CTXT_0) ||
+		(hw_cntxt_id >= CAM_ISP_MULTI_CTXT_MAX))) {
+		CAM_ERR(CAM_ISP, "Invalid hw context id : %d for wm update", hw_cntxt_id);
+		rc = -EINVAL;
+		goto end;
 	}
 
 	for (i = 0, j = 0; i < num_wm; i++) {
@@ -3665,12 +3869,6 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 				update_buf->wm_update->local_id);
 		}
 
-		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
-			wm_data->hw_regs->cfg, wm_data->en_cfg);
-		CAM_DBG(CAM_ISP, "VFE:%u WM:%d %s en_cfg 0x%X",
-			bus_priv->common_data.core_index, wm_data->index,
-			vfe_out_data->wm_res[i].res_name, reg_val_pair[j-1]);
-
 		val = (wm_data->height << 16) | wm_data->width;
 		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
 			wm_data->hw_regs->image_cfg_0, val);
@@ -3694,7 +3892,10 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 			CAM_DBG(CAM_ISP, "VFE:%u Warning stride %u expected %u",
 				bus_priv->common_data.core_index, stride, val);
 
-		if (wm_data->stride != val || !wm_data->init_cfg_done) {
+		if (wm_data->stride != val || !wm_data->init_cfg_done ||
+			((wm_data->out_rsrc_data->mc_based ||
+			wm_data->out_rsrc_data->cntxt_cfg_except) &&
+			!wm_data->mc_data[hw_cntxt_id].init_cfg_done)) {
 			CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
 				wm_data->hw_regs->image_cfg_2,
 				stride);
@@ -3736,10 +3937,19 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 				rc = -EINVAL;
 				goto end;
 			}
-			if (wm_data->ubwc_updated) {
-				wm_data->ubwc_updated = false;
-				cam_vfe_bus_ver3_update_ubwc_regs(
-					wm_data, reg_val_pair, i, &j);
+			if ((wm_data->out_rsrc_data->mc_based ||
+				wm_data->out_rsrc_data->cntxt_cfg_except) &&
+				wm_data->mc_data[hw_cntxt_id].ubwc_cfg_data.ubwc_updated) {
+				wm_data->mc_data[hw_cntxt_id].ubwc_cfg_data.ubwc_updated = false;
+				cam_vfe_bus_ver3_update_ubwc_regs(wm_data,
+					&wm_data->mc_data[hw_cntxt_id].ubwc_cfg_data,
+					reg_val_pair, i, &j);
+			} else if (wm_data->ubwc_cfg_data.ubwc_updated) {
+				wm_data->ubwc_cfg_data.ubwc_updated = false;
+				cam_vfe_bus_ver3_update_ubwc_regs(wm_data,
+					&wm_data->ubwc_cfg_data,
+					reg_val_pair, i, &j);
+
 			}
 
 			/* UBWC meta address */
@@ -3822,13 +4032,19 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 			CAM_BOOL_TO_YESNO(cam_smmu_is_expanded_memory()));
 
 		/* enable the WM */
-		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
-			wm_data->hw_regs->cfg,
-			wm_data->en_cfg);
+		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j, wm_data->hw_regs->cfg, wm_data->en_cfg);
+		CAM_DBG(CAM_ISP, "VFE:%u WM:%d %s en_cfg 0x%X",
+			bus_priv->common_data.core_index, wm_data->index,
+			vfe_out_data->wm_res[i].res_name, reg_val_pair[j-1]);
 
 		/* set initial configuration done */
 		if (!wm_data->init_cfg_done)
 			wm_data->init_cfg_done = true;
+
+		if ((wm_data->out_rsrc_data->mc_based ||
+			wm_data->out_rsrc_data->cntxt_cfg_except) &&
+			!wm_data->mc_data[hw_cntxt_id].init_cfg_done)
+			wm_data->mc_data[hw_cntxt_id].init_cfg_done = true;
 	}
 
 	num_regval_pairs = j / 2;
@@ -3991,6 +4207,84 @@ end:
 	return rc;
 }
 
+static void cam_vfe_bus_ver3_update_wm_ubwc_data(
+	struct cam_vfe_bus_ver3_wm_resource_data *wm_data,
+	struct cam_vfe_bus_ver3_wm_ubwc_cfg_data *ubwc_cfg_data,
+	struct cam_vfe_generic_ubwc_plane_config *ubwc_generic_plane_cfg,
+	bool init_cfg_done)
+{
+	if (wm_data->packer_cfg !=
+		ubwc_generic_plane_cfg->packer_config ||
+		!init_cfg_done) {
+		wm_data->packer_cfg =
+			ubwc_generic_plane_cfg->packer_config;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if ((!wm_data->is_dual) && ((wm_data->h_init !=
+		ubwc_generic_plane_cfg->h_init) ||
+		!init_cfg_done)) {
+		wm_data->h_init = ubwc_generic_plane_cfg->h_init;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if (ubwc_cfg_data->ubwc_meta_cfg !=
+		ubwc_generic_plane_cfg->meta_stride ||
+		!init_cfg_done) {
+		ubwc_cfg_data->ubwc_meta_cfg =
+			ubwc_generic_plane_cfg->meta_stride;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if (ubwc_cfg_data->ubwc_mode_cfg !=
+		ubwc_generic_plane_cfg->mode_config_0 ||
+		!init_cfg_done) {
+		ubwc_cfg_data->ubwc_mode_cfg =
+			ubwc_generic_plane_cfg->mode_config_0;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if (ubwc_cfg_data->ubwc_ctrl_2 !=
+		ubwc_generic_plane_cfg->ctrl_2 ||
+		!init_cfg_done) {
+		ubwc_cfg_data->ubwc_ctrl_2 =
+			ubwc_generic_plane_cfg->ctrl_2;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if (ubwc_cfg_data->ubwc_lossy_threshold_0 !=
+		ubwc_generic_plane_cfg->lossy_threshold_0 ||
+		!init_cfg_done) {
+		ubwc_cfg_data->ubwc_lossy_threshold_0 =
+			ubwc_generic_plane_cfg->lossy_threshold_0;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if (ubwc_cfg_data->ubwc_lossy_threshold_1 !=
+		ubwc_generic_plane_cfg->lossy_threshold_1 ||
+		!init_cfg_done) {
+		ubwc_cfg_data->ubwc_lossy_threshold_1 =
+			ubwc_generic_plane_cfg->lossy_threshold_1;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if (ubwc_cfg_data->ubwc_offset_lossy_variance !=
+		ubwc_generic_plane_cfg->lossy_var_offset ||
+		!init_cfg_done) {
+		ubwc_cfg_data->ubwc_offset_lossy_variance =
+			ubwc_generic_plane_cfg->lossy_var_offset;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+
+	if (ubwc_cfg_data->ubwc_bandwidth_limit !=
+		ubwc_generic_plane_cfg->bandwidth_limit ||
+		!init_cfg_done) {
+		ubwc_cfg_data->ubwc_bandwidth_limit =
+			ubwc_generic_plane_cfg->bandwidth_limit;
+		ubwc_cfg_data->ubwc_updated = true;
+	}
+}
+
 static int cam_vfe_bus_ver3_update_ubwc_config_v2(void *cmd_args)
 {
 	struct cam_isp_hw_get_cmd_update         *update_ubwc;
@@ -4042,75 +4336,77 @@ static int cam_vfe_bus_ver3_update_ubwc_config_v2(void *cmd_args)
 			goto end;
 		}
 
-		if (wm_data->packer_cfg !=
-			ubwc_generic_plane_cfg->packer_config ||
-			!wm_data->init_cfg_done) {
-			wm_data->packer_cfg =
-				ubwc_generic_plane_cfg->packer_config;
-			wm_data->ubwc_updated = true;
+		cam_vfe_bus_ver3_update_wm_ubwc_data(wm_data, &wm_data->ubwc_cfg_data,
+			ubwc_generic_plane_cfg, wm_data->init_cfg_done);
+	}
+
+end:
+	return rc;
+}
+
+static int cam_vfe_bus_ver3_update_ubwc_config_v3(void *cmd_args)
+{
+	struct cam_isp_hw_get_cmd_update         *update_ubwc;
+	struct cam_vfe_bus_ver3_vfe_out_data     *vfe_out_data = NULL;
+	struct cam_vfe_bus_ver3_wm_resource_data *wm_data = NULL;
+	struct cam_vfe_generic_ubwc_config       *ubwc_generic_cfg = NULL;
+	struct cam_vfe_generic_ubwc_plane_config *ubwc_generic_plane_cfg = NULL;
+	uint32_t                                  i, j;
+	int                                       rc = 0;
+
+	if (!cmd_args) {
+		CAM_ERR(CAM_ISP, "Invalid args");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	update_ubwc =  (struct cam_isp_hw_get_cmd_update *) cmd_args;
+
+	vfe_out_data = (struct cam_vfe_bus_ver3_vfe_out_data *)
+		update_ubwc->res->res_priv;
+
+	if (!vfe_out_data || !vfe_out_data->common_data->cdm_util_ops) {
+		CAM_ERR(CAM_ISP, "Invalid data");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	ubwc_generic_cfg = (struct cam_vfe_generic_ubwc_config *)
+		update_ubwc->data;
+
+	for (i = 0; i < vfe_out_data->num_wm; i++) {
+
+		wm_data = vfe_out_data->wm_res[i].res_priv;
+		ubwc_generic_plane_cfg = &ubwc_generic_cfg->ubwc_plane_cfg[i];
+
+		if (!wm_data->hw_regs->ubwc_regs) {
+			CAM_ERR(CAM_ISP,
+				"VFE:%u No UBWC register to configure.",
+				vfe_out_data->common_data->core_index);
+			rc = -EINVAL;
+			goto end;
 		}
 
-		if ((!wm_data->is_dual) && ((wm_data->h_init !=
-			ubwc_generic_plane_cfg->h_init) ||
-			!wm_data->init_cfg_done)) {
-			wm_data->h_init = ubwc_generic_plane_cfg->h_init;
-			wm_data->ubwc_updated = true;
+		if (!wm_data->en_ubwc) {
+			CAM_ERR(CAM_ISP, "VFE:%u UBWC Disabled",
+				vfe_out_data->common_data->core_index);
+			rc = -EINVAL;
+			goto end;
 		}
 
-		if (wm_data->ubwc_meta_cfg !=
-			ubwc_generic_plane_cfg->meta_stride ||
-			!wm_data->init_cfg_done) {
-			wm_data->ubwc_meta_cfg =
-				ubwc_generic_plane_cfg->meta_stride;
-			wm_data->ubwc_updated = true;
-		}
+		if ((vfe_out_data->mc_based || vfe_out_data->cntxt_cfg_except) &&
+			wm_data->mc_data) {
+			for (j = 0; j < CAM_ISP_MULTI_CTXT_MAX; j++) {
+				if (!(ubwc_generic_plane_cfg->hw_ctx_id_mask & BIT(j)))
+					continue;
 
-		if (wm_data->ubwc_mode_cfg !=
-			ubwc_generic_plane_cfg->mode_config_0 ||
-			!wm_data->init_cfg_done) {
-			wm_data->ubwc_mode_cfg =
-				ubwc_generic_plane_cfg->mode_config_0;
-			wm_data->ubwc_updated = true;
-		}
-
-		if (wm_data->ubwc_ctrl_2 !=
-			ubwc_generic_plane_cfg->ctrl_2 ||
-			!wm_data->init_cfg_done) {
-			wm_data->ubwc_ctrl_2 =
-				ubwc_generic_plane_cfg->ctrl_2;
-			wm_data->ubwc_updated = true;
-		}
-
-		if (wm_data->ubwc_lossy_threshold_0 !=
-			ubwc_generic_plane_cfg->lossy_threshold_0 ||
-			!wm_data->init_cfg_done) {
-			wm_data->ubwc_lossy_threshold_0 =
-				ubwc_generic_plane_cfg->lossy_threshold_0;
-			wm_data->ubwc_updated = true;
-		}
-
-		if (wm_data->ubwc_lossy_threshold_1 !=
-			ubwc_generic_plane_cfg->lossy_threshold_1 ||
-			!wm_data->init_cfg_done) {
-			wm_data->ubwc_lossy_threshold_1 =
-				ubwc_generic_plane_cfg->lossy_threshold_1;
-			wm_data->ubwc_updated = true;
-		}
-
-		if (wm_data->ubwc_offset_lossy_variance !=
-			ubwc_generic_plane_cfg->lossy_var_offset ||
-			!wm_data->init_cfg_done) {
-			wm_data->ubwc_offset_lossy_variance =
-				ubwc_generic_plane_cfg->lossy_var_offset;
-			wm_data->ubwc_updated = true;
-		}
-
-		if (wm_data->ubwc_bandwidth_limit !=
-			ubwc_generic_plane_cfg->bandwidth_limit ||
-			!wm_data->init_cfg_done) {
-			wm_data->ubwc_bandwidth_limit =
-				ubwc_generic_plane_cfg->bandwidth_limit;
-			wm_data->ubwc_updated = true;
+				cam_vfe_bus_ver3_update_wm_ubwc_data(wm_data,
+					&wm_data->mc_data[j].ubwc_cfg_data, ubwc_generic_plane_cfg,
+					wm_data->mc_data[j].init_cfg_done);
+			}
+		} else {
+			cam_vfe_bus_ver3_update_wm_ubwc_data(wm_data, &wm_data->ubwc_cfg_data,
+				ubwc_generic_plane_cfg, wm_data->init_cfg_done);
 		}
 	}
 
@@ -4236,7 +4532,8 @@ static int cam_vfe_bus_ver3_update_wm_config(
 			/* Reconfigure only for valid packer fmt */
 			if (packer_fmt != PACKER_FMT_VER3_MAX) {
 				if ((vfe_out_data->out_type >= CAM_VFE_BUS_VER3_VFE_OUT_RDI0) &&
-					(vfe_out_data->out_type <= CAM_VFE_BUS_VER3_VFE_OUT_RDI5)) {
+					(vfe_out_data->out_type <=
+					CAM_VFE_BUS_VER3_VFE_OUT_RDI11)) {
 					if (wm_config->wm_mode != wm_data->wm_mode) {
 						wm_data->wm_mode = wm_config->wm_mode;
 						cam_vfe_bus_ver3_config_rdi_wm(wm_data);
@@ -4772,9 +5069,43 @@ static int cam_vfe_bus_ver3_update_res_vfe_out(void *bus_priv, void *acquire_arg
 	return rc;
 }
 
+static int cam_vfe_bus_ver3_update_res_comp_grp_state(
+	struct cam_vfe_bus_ver3_priv         *ver3_bus_priv,
+	struct cam_isp_resource_node           *wm_res,
+	bool enable)
+{
+	struct cam_vfe_bus_ver3_wm_resource_data  *rsrc_data = NULL;
+	struct cam_isp_resource_node              *comp_grp_local = NULL;
+	enum cam_vfe_bus_ver3_comp_grp_type       comp_grp_id;
+	bool previously_acquired = false;
+
+	if (!ver3_bus_priv || !wm_res) {
+		CAM_ERR(CAM_ISP, "Invalid params");
+		return -EINVAL;
+	}
+
+	rsrc_data = wm_res->res_priv;
+	comp_grp_id = rsrc_data->hw_regs->comp_group;
+
+	previously_acquired = cam_vfe_bus_ver3_match_comp_grp(
+		ver3_bus_priv, &comp_grp_local, comp_grp_id);
+
+	if (!comp_grp_local || !previously_acquired) {
+		CAM_ERR(CAM_ISP, "Invalid comp_grp:%d", comp_grp_id);
+		return -ENODEV;
+	}
+
+	if (enable)
+		comp_grp_local->res_state = CAM_ISP_RESOURCE_STATE_STREAMING;
+	else
+		comp_grp_local->res_state = CAM_ISP_RESOURCE_STATE_RESERVED;
+
+	return 0;
+}
+
 static int cam_vfe_bus_ver3_enable_irq_vfe_out(void *bus_priv, void *res_irq_mask)
 {
-	int   i, rc = 0;
+	int   i, j, rc = 0, num_wm = 0;
 	struct cam_vfe_bus_ver3_vfe_out_data  *rsrc_data = NULL;
 	struct cam_vfe_bus_ver3_common_data   *common_data = NULL;
 	uint32_t source_group = 0;
@@ -4850,6 +5181,9 @@ static int cam_vfe_bus_ver3_enable_irq_vfe_out(void *bus_priv, void *res_irq_mas
 						CAM_IRQ_EVT_GROUP_1);
 
 				if (common_data->rup_irq_handle[source_group] < 1) {
+					cam_irq_controller_unsubscribe_irq(
+						common_data->buf_done_controller,
+						vfe_out->irq_handle);
 					CAM_ERR(CAM_ISP, "VFE:%u Failed to subscribe RUP IRQ",
 						rsrc_data->common_data->core_index);
 						common_data->rup_irq_handle[source_group] = 0;
@@ -4857,11 +5191,23 @@ static int cam_vfe_bus_ver3_enable_irq_vfe_out(void *bus_priv, void *res_irq_mas
 				}
 			}
 		} else if (vfe_out->irq_handle) {
+			num_wm = cam_vfe_bus_ver3_get_num_wm(rsrc_data);
+			for (j = 0; j < num_wm; j++) {
+				cam_vfe_bus_ver3_update_res_comp_grp_state(bus_priv,
+					&rsrc_data->wm_res[j], irq_args->enable_irq);
+			}
+
+			if (!irq_args->enable_irq)
+				vfe_out->res_state = CAM_ISP_RESOURCE_STATE_RESERVED;
+			else
+				vfe_out->res_state = CAM_ISP_RESOURCE_STATE_STREAMING;
+
 			rc = cam_irq_controller_update_irq(
 				common_data->buf_done_controller,
 				vfe_out->irq_handle,
 				irq_args->enable_irq,
-				rsrc_data->stored_irq_masks[CAM_VFE_BUS_VER3_BUF_DONE_MASK]);
+				rsrc_data->stored_irq_masks[CAM_VFE_BUS_VER3_BUF_DONE_MASK],
+				vfe_out->tasklet_info);
 
 			if (rc) {
 				CAM_ERR(CAM_ISP, "Update IRQ failed for VFE out_res %d",
@@ -4869,8 +5215,12 @@ static int cam_vfe_bus_ver3_enable_irq_vfe_out(void *bus_priv, void *res_irq_mas
 				return -EFAULT;
 			}
 
-			if ((common_data->is_lite || source_group > CAM_VFE_BUS_VER3_SRC_GRP_0))
-				goto end;
+			if ((common_data->is_lite || source_group > CAM_VFE_BUS_VER3_SRC_GRP_0)) {
+				if (i == (irq_args->num_res - 1))
+					goto end;
+				else
+					continue;
+			}
 
 			if ((common_data->supported_irq & CAM_VFE_HW_IRQ_CAP_RUP)) {
 				rsrc_data->stored_irq_masks[CAM_VFE_BUS_VER3_RUP_MASK]
@@ -4879,7 +5229,8 @@ static int cam_vfe_bus_ver3_enable_irq_vfe_out(void *bus_priv, void *res_irq_mas
 						common_data->bus_irq_controller,
 						common_data->rup_irq_handle[source_group],
 						irq_args->enable_irq,
-						rsrc_data->stored_irq_masks[CAM_VFE_BUS_VER3_RUP_MASK]);
+						rsrc_data->stored_irq_masks[CAM_VFE_BUS_VER3_RUP_MASK],
+						vfe_out->tasklet_info);
 				if (rc) {
 					CAM_ERR(CAM_ISP, "Update IRQ failed for VFE out_res %d",
 						vfe_out->res_id);
@@ -5133,6 +5484,9 @@ static int cam_vfe_bus_ver3_process_cmd(
 	case CAM_ISP_HW_CMD_UBWC_UPDATE_V2:
 		rc = cam_vfe_bus_ver3_update_ubwc_config_v2(cmd_args);
 		break;
+	case CAM_ISP_HW_CMD_UBWC_UPDATE_V3:
+		rc = cam_vfe_bus_ver3_update_ubwc_config_v3(cmd_args);
+		break;
 	case CAM_ISP_HW_CMD_WM_CONFIG_UPDATE:
 		rc = cam_vfe_bus_ver3_update_wm_config(cmd_args);
 		break;
@@ -5154,6 +5508,12 @@ static int cam_vfe_bus_ver3_process_cmd(
 		vfe_bus_cap->max_out_res_type = bus_priv->max_out_res;
 		vfe_bus_cap->support_consumed_addr =
 			bus_priv->common_data.support_consumed_addr;
+		vfe_bus_cap->skip_regdump_data.skip_regdump =
+			bus_priv->bus_hw_info->skip_regdump;
+		vfe_bus_cap->skip_regdump_data.skip_regdump_start_offset =
+			bus_priv->bus_hw_info->skip_regdump_start_offset;
+		vfe_bus_cap->skip_regdump_data.skip_regdump_stop_offset =
+			bus_priv->bus_hw_info->skip_regdump_stop_offset;
 		break;
 	case CAM_ISP_HW_CMD_GET_LAST_CONSUMED_ADDR:
 		bus_priv = (struct cam_vfe_bus_ver3_priv  *) priv;
@@ -5283,6 +5643,8 @@ int cam_vfe_bus_ver3_init(
 	bus_priv->common_data.is_lite = soc_private->is_ife_lite;
 	bus_priv->common_data.support_consumed_addr =
 		ver3_hw_info->support_consumed_addr;
+	bus_priv->common_data.support_burst_limit =
+		ver3_hw_info->support_burst_limit;
 	bus_priv->common_data.disable_ubwc_comp = false;
 	bus_priv->common_data.supported_irq      = ver3_hw_info->supported_irq;
 	bus_priv->common_data.comp_config_needed =

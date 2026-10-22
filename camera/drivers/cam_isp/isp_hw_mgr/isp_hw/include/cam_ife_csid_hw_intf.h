@@ -11,7 +11,7 @@
 #include "cam_hw_intf.h"
 
 /* MAX IFE CSID instance */
-#define CAM_IFE_CSID_HW_NUM_MAX                        8
+#define CAM_IFE_CSID_HW_NUM_MAX                        16
 #define CAM_IFE_CSID_UDI_MAX                           3
 #define RT_BASE_IDX                                    2
 #define CAM_ISP_MAX_PATHS                              8
@@ -70,8 +70,33 @@ enum cam_ife_pix_path_res_id {
 	CAM_IFE_PIX_PATH_RES_UDI_2,
 	CAM_IFE_PIX_PATH_RES_IPP_1,
 	CAM_IFE_PIX_PATH_RES_IPP_2,
+	CAM_IFE_PIX_PATH_RES_IPP_3,
+	CAM_IFE_PIX_PATH_RES_RDI_6,
+	CAM_IFE_PIX_PATH_RES_RDI_7,
+	CAM_IFE_PIX_PATH_RES_RDI_8,
+	CAM_IFE_PIX_PATH_RES_RDI_9,
+	CAM_IFE_PIX_PATH_RES_RDI_10,
+	CAM_IFE_PIX_PATH_RES_RDI_11,
 	CAM_IFE_PIX_PATH_RES_MAX,
 };
+
+/**
+ * cam_ife_csid_is_rdi_res_id() - Check whether given CSID path is RDI
+ * @res_id: CSID pixel path resource id
+ *
+ * Return: true if resource id maps to any RDI path, otherwise false.
+ */
+bool cam_ife_csid_is_rdi_res_id(uint32_t res_id);
+
+/**
+ * cam_ife_csid_get_rdi_res_id_from_index() - Get CSID RDI resource id by index
+ * @rdi_idx: Zero-based RDI index
+ * @res_id: Output pointer for resolved CSID resource id
+ *
+ * Return: true if @rdi_idx maps to a valid RDI resource id, otherwise false.
+ */
+bool cam_ife_csid_get_rdi_res_id_from_index(uint32_t rdi_idx,
+	uint32_t *res_id);
 
 /**
  * enum cam_ife_cid_res_id - Specify the csid cid
@@ -614,12 +639,14 @@ struct cam_ife_csid_discard_init_frame_args {
  * @csid_rx_capture_debug: CSID rx capture debug val
  * @csid_testbus_debug: CSID test bus val
  * @rx_capture_debug_set: CSID rx capture debug set;
+ * @enable_cdr_sweep_debug:    If CDR sweep for CSIPHY is enabled
  */
 struct cam_ife_csid_debug_cfg_args {
 	uint64_t                          csid_debug;
 	uint32_t                          csid_rx_capture_debug;
 	uint32_t                          csid_testbus_debug;
 	bool                              rx_capture_debug_set;
+	bool                              enable_cdr_sweep_debug;
 };
 
 /*

@@ -25,6 +25,7 @@
 #include "cam_cdm_hw_reg_2_0.h"
 #include "cam_cdm_hw_reg_2_1.h"
 #include "cam_cdm_hw_reg_2_2.h"
+#include "cam_cdm_hw_reg_3_1.h"
 #include "camera_main.h"
 #include "cam_trace.h"
 #include "cam_req_mgr_workq.h"
@@ -37,6 +38,11 @@
 #define CAM_CDM_FIFO_LEN_REG_TAG_MASK        0xFF
 #define CAM_CDM_FIFO_LEN_REG_TAG_SHIFT       24
 #define CAM_CDM_FIFO_LEN_REG_ARB_SHIFT       20
+#define CAM_CDM_FIFO_LEN_REG_NBW_SHIFT       21
+#define CAM_CDM_IRQ_MASK_ENABLE \
+	(CAM_CDM_IRQ_STATUS_RST_DONE_MASK | \
+	 CAM_CDM_IRQ_STATUS_INLINE_IRQ_MASK | \
+	 CAM_CDM_IRQ_STATUS_ERRORS)
 
 static void cam_hw_cdm_dump_scratch_registors(struct cam_hw_info *cdm_hw) __attribute__((unused));
 static void cam_hw_cdm_work(struct work_struct *work);
@@ -87,6 +93,10 @@ static const struct of_device_id msm_cam_hw_cdm_dt_match[] = {
 		.compatible  = CAM_HW_CDM_RT_NAME_2_2,
 		.data = &cam_cdm_2_2_reg_offset,
 	},
+	{
+		.compatible  = CAM_HW_CDM_RT_NAME_3_1,
+		.data = &cam_cdm_3_1_reg_offset,
+	},
 	{},
 };
 
@@ -125,6 +135,9 @@ static enum cam_cdm_id cam_hw_cdm_get_id_by_name(char *name)
 	if (strnstr(name, CAM_HW_CDM_RT_NAME_2_2,
 			strlen(CAM_HW_CDM_RT_NAME_2_2)))
 		return CAM_CDM_RT;
+	if (strnstr(name, CAM_HW_CDM_RT_NAME_3_1,
+			strlen(CAM_HW_CDM_RT_NAME_3_1)))
+		return CAM_CDM_RT;
 	return CAM_CDM_MAX;
 }
 
@@ -156,7 +169,7 @@ static int cam_hw_cdm_enable_bl_done_irq(struct cam_hw_info *cdm_hw,
 	} else {
 		if (cam_cdm_write_hw_reg(cdm_hw,
 				core->offsets->irq_reg[fifo_idx]->irq_mask,
-				(irq_mask & 0x70003))) {
+				(irq_mask & CAM_CDM_IRQ_MASK_ENABLE))) {
 			CAM_ERR(CAM_CDM, "Write failed to disable BL done irq");
 		} else {
 			clear_bit(fifo_idx, &core->cdm_status);
@@ -572,8 +585,11 @@ void cam_hw_cdm_dump_core_debug_registers(struct cam_hw_info *cdm_hw,
 	if (cdm_version >= CAM_CDM_VERSION_2_0)
 		CAM_INFO(CAM_CDM,
 			"Last fetched BL by cdm from fifo: %u has Base: 0x%x, len: %d ARB: %d tag: %d ",
-			(dump_reg[1] & CAM_CDM_CURRENT_BL_FIFO) >>
-				CAM_CDM_CURRENT_BL_FIFO_SHIFT,
+			(core->offsets->cmn_reg->current_bl_cid ?
+				({ uint32_t _cid = 0; cam_cdm_read_hw_reg(cdm_hw,
+					core->offsets->cmn_reg->current_bl_cid, &_cid); _cid; }) :
+				((dump_reg[1] & CAM_CDM_CURRENT_BL_FIFO) >>
+					CAM_CDM_CURRENT_BL_FIFO_SHIFT)),
 			dump_reg[0],
 			(dump_reg[1] & CAM_CDM_CURRENT_BL_LEN),
 			(dump_reg[1] & CAM_CDM_CURRENT_BL_ARB) >>
@@ -636,7 +652,7 @@ static int cam_hw_cdm_set_cdm_blfifo_cfg(struct cam_hw_info *cdm_hw)
 			continue;
 
 		rc = cam_cdm_write_hw_reg(cdm_hw,
-			core->offsets->irq_reg[i]->irq_mask, 0x70003);
+			core->offsets->irq_reg[i]->irq_mask, CAM_CDM_IRQ_MASK_ENABLE);
 		if (rc) {
 			CAM_ERR(CAM_CDM,
 				"Unable to write to %s%u irq mask register",
@@ -693,16 +709,30 @@ static int cam_hw_cdm_set_cdm_core_cfg(struct cam_hw_info *cdm_hw)
 	}
 
 	if (cdm_version >= CAM_CDM_VERSION_2_0) {
-		if (core->id != CAM_CDM_CPAS &&
-			(!pvt_data->is_single_ctx_cdm))
+		if (core->id == CAM_CDM_OPE)
 			cfg_mask = cfg_mask | CAM_CDM_IMPLICIT_WAIT_EN;
 
 		if (core->arbitration == CAM_CDM_ARBITRATION_ROUND_ROBIN)
 			cfg_mask = cfg_mask | CAM_CDM_ARB_SEL_RR;
-
 	}
 
-	if (cdm_version >= CAM_CDM_VERSION_2_1) {
+	/*
+	 * CDM 3.x: priority config moved to ARB_PRIORITY_CFG0/1 registers.
+	 * CDM 2.1/2.2: priority written into CORE_CFG via priority_group_bit_offset.
+	 * Use register presence (non-zero offset) to select the right path.
+	 */
+	if (core->offsets->cmn_reg->arb_priority_cfg0) {
+		rc = cam_cdm_write_hw_reg(cdm_hw,
+			core->offsets->cmn_reg->arb_priority_cfg0,
+			(uint32_t)pvt_data->priority_group);
+		if (rc) {
+			CAM_ERR(CAM_CDM, "Error writing %s%u arb_priority_cfg0",
+				cdm_hw->soc_info.label_name,
+				cdm_hw->soc_info.index);
+			rc = -EIO;
+			goto end;
+		}
+	} else if (core->offsets->cmn_reg->priority_group_bit_offset) {
 		cfg_mask = cfg_mask | ((uint32_t)pvt_data->priority_group <<
 			core->offsets->cmn_reg->priority_group_bit_offset);
 	}
@@ -801,13 +831,14 @@ end:
 static bool cam_hw_cdm_bl_write(
 		struct cam_hw_info *cdm_hw, uint32_t src,
 		uint32_t len, uint32_t tag, bool set_arb,
-		uint32_t fifo_idx)
+		bool set_nbw, uint32_t fifo_idx)
 {
 	struct cam_cdm *cdm_core = (struct cam_cdm *)cdm_hw->core_info;
 
-	CAM_DBG(CAM_CDM, "%s%d Base: 0x%x, Len: %u, Tag: %u, set_arb: %u, fifo_idx: %u",
+	CAM_DBG(CAM_CDM,
+		"%s%d Base: 0x%x, Len: %u, Tag: %u, set_arb: %u, set_nbw: %u, fifo_idx: %u",
 		cdm_hw->soc_info.label_name, cdm_hw->soc_info.index,
-		src, len, tag, set_arb, fifo_idx);
+		src, len, tag, set_arb, set_nbw, fifo_idx);
 
 	if (cam_cdm_write_hw_reg(cdm_hw,
 		cdm_core->offsets->bl_fifo_reg[fifo_idx]->bl_fifo_base,
@@ -819,7 +850,8 @@ static bool cam_hw_cdm_bl_write(
 		cdm_core->offsets->bl_fifo_reg[fifo_idx]->bl_fifo_len,
 		((len & CAM_CDM_FIFO_LEN_REG_LEN_MASK) |
 			((tag & CAM_CDM_FIFO_LEN_REG_TAG_MASK) << CAM_CDM_FIFO_LEN_REG_TAG_SHIFT)) |
-			((set_arb) ? (1 << CAM_CDM_FIFO_LEN_REG_ARB_SHIFT) : (0)))) {
+			((set_arb) ? (1 << CAM_CDM_FIFO_LEN_REG_ARB_SHIFT) : 0) |
+			((set_nbw) ? (1 << CAM_CDM_FIFO_LEN_REG_NBW_SHIFT) : 0))) {
 		CAM_ERR(CAM_CDM, "Failed to write CDM BL len");
 		return true;
 	}
@@ -879,7 +911,8 @@ static int cam_hw_cdm_submit_gen_irq(
 		return -ENOMEM;
 	}
 
-	if (core->offsets->reg_data->num_bl_fifo > 1)
+	if (core->offsets->reg_data->num_bl_fifo > 1 &&
+		!core->offsets->reg_data->has_per_ctx_usr_data)
 		bit_wr_enable = true;
 
 	node->request_type = CAM_HW_CDM_BL_CB_CLIENT;
@@ -891,11 +924,12 @@ static int cam_hw_cdm_submit_gen_irq(
 
 	core->ops->cdm_write_genirq(
 		cdm_cmd->genirq_buff->cpu_addr + (cdm_cmd->genirq_buff->used_bytes / 4),
-		core->bl_fifo[fifo_idx].bl_tag, bit_wr_enable, fifo_idx);
+		core->bl_fifo[fifo_idx].bl_tag, bit_wr_enable,
+		core->offsets->reg_data->has_per_ctx_usr_data, fifo_idx);
 	rc = cam_hw_cdm_bl_write(cdm_hw,
 		(uint32_t)(hw_vaddr_ptr + cdm_cmd->genirq_buff->offset),
 		genirq_cmd_size - 1,
-		core->bl_fifo[fifo_idx].bl_tag, cdm_cmd->gen_irq_arb, fifo_idx);
+		core->bl_fifo[fifo_idx].bl_tag, cdm_cmd->gen_irq_arb, false, fifo_idx);
 	if (rc) {
 		CAM_ERR(CAM_CDM, "CDM hw bl write failed for gen irq bltag=%d",
 			core->bl_fifo[fifo_idx].bl_tag);
@@ -979,17 +1013,19 @@ static int cam_hw_cdm_submit_debug_gen_irq(
 		return -EINVAL;
 	}
 
-	if (core->offsets->reg_data->num_bl_fifo > 1)
+	if (core->offsets->reg_data->num_bl_fifo > 1 &&
+		!core->offsets->reg_data->has_per_ctx_usr_data)
 		bit_wr_enable = true;
 
 	core->ops->cdm_write_genirq(
 		cdm_cmd->genirq_buff->cpu_addr + (cdm_cmd->genirq_buff->used_bytes / 4),
-		CAM_CDM_DBG_GEN_IRQ_USR_DATA, bit_wr_enable, fifo_idx);
+		CAM_CDM_DBG_GEN_IRQ_USR_DATA, bit_wr_enable,
+		core->offsets->reg_data->has_per_ctx_usr_data, fifo_idx);
 	rc = cam_hw_cdm_bl_write(cdm_hw,
 		(uint32_t)(hw_vaddr_ptr + cdm_cmd->genirq_buff->offset),
 		genirq_cmd_size - 1,
 		core->bl_fifo[fifo_idx].bl_tag,
-		false, fifo_idx);
+		false, false, fifo_idx);
 	if (rc) {
 		CAM_ERR(CAM_CDM, "CDM hw bl write failed for Debug GenIRQ USRdata: %d, Tag: 0x%x",
 			CAM_CDM_DBG_GEN_IRQ_USR_DATA, core->bl_fifo[fifo_idx].bl_tag);
@@ -1146,6 +1182,7 @@ int cam_hw_cdm_submit_bl(struct cam_hw_info *cdm_hw,
 				(cdm_cmd->cmd_flex[i].len - 1),
 				core->bl_fifo[fifo_idx].bl_tag,
 				cdm_cmd->cmd_flex[i].arbitrate,
+				cdm_cmd->cmd_flex[i].nbw,
 				fifo_idx);
 			if (rc) {
 				CAM_ERR(CAM_CDM, "Hw bl write failed %d:%d",
@@ -1396,6 +1433,12 @@ static void cam_hw_cdm_work(struct work_struct *work)
 		}
 	}
 	if (payload->irq_status &
+		CAM_CDM_IRQ_STATUS_CTX_FLUSH_DONE_MASK) {
+		CAM_DBG(CAM_CDM, "%s%u context %d flush done IRQ",
+			cdm_hw->soc_info.label_name, cdm_hw->soc_info.index,
+			payload->fifo_idx);
+	}
+	if (payload->irq_status &
 		CAM_CDM_IRQ_STATUS_ERRORS) {
 		int reset_hw_hdl = 0x0;
 
@@ -1596,9 +1639,23 @@ static irqreturn_t cam_hw_cdm_irq(int irq_num, void *data)
 		}
 
 		if (irq_status[i] & CAM_CDM_IRQ_STATUS_INLINE_IRQ_MASK) {
+			/*
+			 * CDM 3.x: each context has its own IRQ_USR_DATA register.
+			 * CDM 2.x: all contexts packed into a single register (8 bits each).
+			 */
+			if (cdm_core->offsets->reg_data->has_per_ctx_usr_data &&
+					cdm_core->offsets->cmn_reg->usr_data_ctx[i]) {
+				uint32_t ctx_usr_data = 0;
 
-			payload[i]->irq_data = (user_data >> (i * 0x8)) &
-				CAM_CDM_IRQ_STATUS_USR_DATA_MASK;
+				cam_cdm_read_hw_reg(cdm_hw,
+					*cdm_core->offsets->cmn_reg->usr_data_ctx[i],
+					&ctx_usr_data);
+				payload[i]->irq_data = ctx_usr_data &
+					CAM_CDM_IRQ_STATUS_USR_DATA_MASK;
+			} else {
+				payload[i]->irq_data = (user_data >> (i * 0x8)) &
+					CAM_CDM_IRQ_STATUS_USR_DATA_MASK;
+			}
 
 			if (payload[i]->irq_data == CAM_CDM_DBG_GEN_IRQ_USR_DATA)
 				CAM_INFO(CAM_CDM, "Debug gen_irq received");
@@ -1760,8 +1817,18 @@ int cam_hw_cdm_handle_error_info(
 			cdm_core->offsets->cmn_reg->current_bl_len,
 			&current_bl_data);
 
-	current_fifo = ((CAM_CDM_CURRENT_BL_FIFO & current_bl_data)
-		>> CAM_CDM_CURRENT_BL_FIFO_SHIFT);
+	/*
+	 * CDM 3.x: CID is in the dedicated CURRENT_BL_CID register (0xF8).
+	 * CDM 2.x: CID is packed in current_bl_len[23:22].
+	 */
+	if (cdm_core->offsets->cmn_reg->current_bl_cid) {
+		cam_cdm_read_hw_reg(cdm_hw,
+			cdm_core->offsets->cmn_reg->current_bl_cid,
+			&current_fifo);
+	} else {
+		current_fifo = ((CAM_CDM_CURRENT_BL_FIFO & current_bl_data)
+			>> CAM_CDM_CURRENT_BL_FIFO_SHIFT);
+	}
 	current_tag = ((CAM_CDM_CURRENT_BL_TAG & current_bl_data)
 		>> CAM_CDM_CURRENT_BL_TAG_SHIFT);
 
@@ -1785,7 +1852,7 @@ int cam_hw_cdm_handle_error_info(
 			(1 << (i + CAM_CDM_BL_FIFO_FLUSH_SHIFT));
 		if (cam_cdm_write_hw_reg(cdm_hw,
 				cdm_core->offsets->irq_reg[i]->irq_mask,
-				0x70003)) {
+				CAM_CDM_IRQ_MASK_ENABLE)) {
 			CAM_ERR(CAM_CDM, "Failed to Write CDM HW IRQ mask");
 			goto end;
 		}
@@ -2137,7 +2204,7 @@ int cam_hw_cdm_deinit(void *hw_priv,
 			(1 << (i + CAM_CDM_BL_FIFO_FLUSH_SHIFT));
 		if (cam_cdm_write_hw_reg(cdm_hw,
 				cdm_core->offsets->irq_reg[i]->irq_mask,
-				0x70003)) {
+				CAM_CDM_IRQ_MASK_ENABLE)) {
 			CAM_ERR(CAM_CDM, "Failed to Write CDM HW IRQ mask");
 		}
 	}
@@ -2410,7 +2477,7 @@ static int cam_hw_cdm_component_bind(struct device *dev,
 				i, cdm_core->bl_fifo[i].bl_depth);
 		}
 	} else {
-		for (i = 0; i < CAM_CDM_BL_FIFO_MAX; i++) {
+		for (i = 0; i < cdm_core->offsets->reg_data->num_bl_fifo; i++) {
 			cdm_core->bl_fifo[i].bl_depth =
 				soc_private->fifo_depth[i];
 			CAM_DBG(CAM_CDM, "Setting FIFO%d length to %d",

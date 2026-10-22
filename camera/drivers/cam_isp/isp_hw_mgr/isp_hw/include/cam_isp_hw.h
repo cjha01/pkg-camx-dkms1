@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_ISP_HW_H_
@@ -52,6 +52,7 @@ enum cam_isp_multi_ctxt_idx {
 	CAM_ISP_MULTI_CTXT_0,
 	CAM_ISP_MULTI_CTXT_1,
 	CAM_ISP_MULTI_CTXT_2,
+	CAM_ISP_MULTI_CTXT_3,
 	CAM_ISP_MULTI_CTXT_MAX
 };
 
@@ -269,6 +270,7 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_CMD_UPDATE_VFE_SRC_RES_IRQ_MASK,
 	CAM_ISP_HW_CMD_UPDATE_VFE_OUT_RES_IRQ_MASK,
 	CAM_ISP_HW_CMD_GET_NUM_OUT_RES,
+	CAM_ISP_HW_CMD_UBWC_UPDATE_V3,
 	CAM_ISP_HW_CMD_MAX,
 };
 
@@ -303,6 +305,7 @@ enum cam_isp_hw_cmd_type {
  * @is_per_port_start:            Indicates start_hw is called on real streamon call or
  *                                on per port streamon call
  * @is_per_port_acquire:          Indicates if resource is yet to be really acquired
+ * @linked:                       Indicates if this hw res to linked to any ife contexts
  */
 struct cam_isp_resource_node {
 	enum cam_isp_resource_type     res_type;
@@ -329,6 +332,8 @@ struct cam_isp_resource_node {
 	bool                           is_rdi_primary_res;
 	bool                           is_per_port_start;
 	bool                           is_per_port_acquire;
+	bool                           is_per_port_intermediate_stop;
+	bool                           linked;
 };
 
 /*
@@ -655,6 +660,22 @@ struct cam_isp_hw_intf_data {
 	uint32_t                hw_pid[CAM_ISP_HW_MAX_PID_VAL];
 };
 /**
+ * struct cam_isp_hw_regiter_dump_data - ISP skip reg dump data
+ *
+ * @Brief:        ISP skip reg dump data
+ *
+ * @skip_regdump:              Regdump skip required for this target or not
+ * @skip_regdump_start_offset: Start register address which needs to skip register dump
+ * @skip_regdump_stop_offset:  Register address which needs to stop skiping register dump
+ *
+ */
+struct cam_isp_hw_regiter_dump_data {
+	bool                    skip_regdump;
+	uint32_t                skip_regdump_start_offset;
+	uint32_t                skip_regdump_stop_offset;
+};
+
+/**
  * struct cam_isp_hw_bus_cap:
  *
  * @Brief:         ISP hw bus capabilities
@@ -662,12 +683,14 @@ struct cam_isp_hw_intf_data {
  * @max_out_res_type:       Maximum value of out resource type supported by hw
  * @num_perf_counters:      Number of perf counters supported
  * @support_consumed_addr:  Indicate whether HW has last consumed addr reg
+ * @skip_regdump_data:      ISP skip reg dump data
  *
  */
 struct cam_isp_hw_cap {
-	uint32_t                max_out_res_type;
-	uint32_t                num_perf_counters;
-	bool                    support_consumed_addr;
+	uint32_t                             max_out_res_type;
+	uint32_t                             num_perf_counters;
+	bool                                 support_consumed_addr;
+	struct cam_isp_hw_regiter_dump_data  skip_regdump_data;
 };
 
 /**
@@ -723,6 +746,15 @@ enum cam_isp_irq_inject_reg_unit_type {
 	CAM_ISP_CSID_PATH_RDI3_REG,
 	CAM_ISP_CSID_PATH_RDI4_REG,
 	CAM_ISP_CSID_PATH_RDI5_REG,
+	CAM_ISP_CSID_PATH_RDI6_REG,
+	CAM_ISP_CSID_PATH_RDI7_REG,
+	CAM_ISP_CSID_PATH_RDI8_REG,
+	CAM_ISP_CSID_PATH_RDI9_REG,
+	CAM_ISP_CSID_PATH_RDI10_REG,
+	CAM_ISP_CSID_PATH_RDI11_REG,
+	CAM_ISP_CSID_PATH_IPP_1_REG,
+	CAM_ISP_CSID_PATH_IPP_2_REG,
+	CAM_ISP_CSID_PATH_IPP_3_REG,
 	CAM_ISP_IFE_0_BUS_WR_INPUT_IF_IRQ_SET_0_REG,
 	CAM_ISP_IFE_0_BUS_WR_INPUT_IF_IRQ_SET_1_REG,
 	CAM_ISP_SFE_0_BUS_RD_INPUT_IF_IRQ_SET_REG,

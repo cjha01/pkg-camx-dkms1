@@ -10,6 +10,39 @@
 #include "uapi/linux/sched/types.h"
 #include "linux/sched/types.h"
 
+/*
+ * CCU output mux is shared across all CCI instances that live inside the
+ * CCU wrapper on Auto-class SoCs. Serialize mux read-modify-write accesses.
+ */
+static DEFINE_MUTEX(g_ccu_mux_mutex);
+
+static int cam_cci_get_ccu_mux_mask(uint32_t cci_index,
+	uint32_t *mux_mask)
+{
+	switch (cci_index) {
+	case 0:
+		*mux_mask = CAM_CCI_CCU_MUX_CCI0_MASK;
+		break;
+	case 1:
+		*mux_mask = CAM_CCI_CCU_MUX_CCI1_MASK;
+		break;
+	case 2:
+		*mux_mask = CAM_CCI_CCU_MUX_CCI2_MASK;
+		break;
+	case 3:
+		*mux_mask = CAM_CCI_CCU_MUX_CCI3_MASK;
+		break;
+	case 4:
+		*mux_mask = CAM_CCI_CCU_MUX_CCI4_MASK;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+
 static int cam_cci_init_master(struct cci_device *cci_dev,
 	enum cci_i2c_master_t master)
 {
@@ -102,6 +135,62 @@ MASTER_INIT_ERR:
 	return rc;
 }
 
+/* Select CCU CCI output for this CCI's two I2C ports. */
+static int cam_cci_select_ccu_cci_path(struct cci_device *cci_dev)
+{
+	int rc = 0;
+	uint32_t val = 0;
+
+	mutex_lock(&g_ccu_mux_mutex);
+
+	rc = cam_cpas_reg_read(cci_dev->cpas_handle,
+		CAM_CPAS_REGBASE_CPASTOP,
+		cci_dev->hw_info->mux_offset, true, &val);
+	if (rc) {
+		CAM_ERR(CAM_CCI,
+			"CCI%d: Titan Top mux read failed rc=%d",
+			cci_dev->soc_info.index, rc);
+		goto unlock;
+	}
+
+	val |= cci_dev->cci_mux_mask;
+	rc = cam_cpas_reg_write(cci_dev->cpas_handle,
+		CAM_CPAS_REGBASE_CPASTOP,
+		cci_dev->hw_info->mux_offset, true, val);
+	if (rc) {
+		CAM_ERR(CAM_CCI,
+			"CCI%d: Titan Top mux set failed rc=%d",
+			cci_dev->soc_info.index, rc);
+		goto unlock;
+	}
+
+	CAM_DBG(CAM_CCI, "CCI%d: CCU CCI mux selected mux_val=0x%x",
+		cci_dev->soc_info.index, val);
+
+unlock:
+	mutex_unlock(&g_ccu_mux_mutex);
+	return rc;
+}
+
+/* Clear CCU CCI selection for this CCI's two I2C ports. */
+static void cam_cci_clear_ccu_cci_path(struct cci_device *cci_dev)
+{
+	uint32_t val = 0;
+
+	mutex_lock(&g_ccu_mux_mutex);
+
+	if (!cam_cpas_reg_read(cci_dev->cpas_handle,
+			CAM_CPAS_REGBASE_CPASTOP,
+			cci_dev->hw_info->mux_offset, true, &val)) {
+		val &= ~cci_dev->cci_mux_mask;
+		cam_cpas_reg_write(cci_dev->cpas_handle,
+			CAM_CPAS_REGBASE_CPASTOP,
+			cci_dev->hw_info->mux_offset, true, val);
+	}
+
+	mutex_unlock(&g_ccu_mux_mutex);
+}
+
 int cam_cci_init(struct v4l2_subdev *sd,
 	struct cam_cci_ctrl *c_ctrl)
 {
@@ -113,6 +202,7 @@ int cam_cci_init(struct v4l2_subdev *sd,
 	struct cam_axi_vote axi_vote = {0};
 	struct cam_hw_soc_info *soc_info = NULL;
 	void __iomem *base = NULL;
+	bool ccu_cci_path_selected = false;
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
@@ -185,6 +275,19 @@ int cam_cci_init(struct v4l2_subdev *sd,
 		return rc;
 	}
 
+	/* Select the CCU CCI path through the CCU mux. */
+	if (cci_dev->hw_info &&
+	    cci_dev->hw_info->variant == CAM_CCI_HW_CCU_LEGACY) {
+		rc = cam_cci_select_ccu_cci_path(cci_dev);
+		if (rc) {
+			CAM_ERR(CAM_CCI,
+				"CCI%d_I2C_M%d CCU CCI path select failed rc=%d",
+				cci_dev->soc_info.index, master, rc);
+			goto platform_enable_failed;
+		}
+		ccu_cci_path_selected = true;
+	}
+
 	cam_cci_get_clk_rates(cci_dev, c_ctrl);
 
 	/* Enable Regulators and IRQ*/
@@ -234,6 +337,8 @@ int cam_cci_init(struct v4l2_subdev *sd,
 reset_complete_failed:
 	cam_soc_util_disable_platform_resource(soc_info, CAM_CLK_SW_CLIENT_IDX, true, true);
 platform_enable_failed:
+	if (ccu_cci_path_selected)
+		cam_cci_clear_ccu_cci_path(cci_dev);
 	cci_dev->ref_count--;
 	cam_cpas_stop(cci_dev->cpas_handle);
 
@@ -402,12 +507,12 @@ static void cam_cci_init_clk_params(struct cci_device *cci_dev)
 	}
 }
 
-int cam_cci_parse_dt_info(struct platform_device *pdev,
-	struct cci_device *new_cci_dev)
+int cam_cci_parse_dt_info(struct cci_device *new_cci_dev)
 {
 	int rc = 0, i = 0;
 	struct cam_hw_soc_info *soc_info =
 		&new_cci_dev->soc_info;
+	struct platform_device *pdev = soc_info->pdev;
 	void *irq_data[CAM_SOC_MAX_IRQ_LINES_PER_DEV] = {0};
 	int32_t  num_irq = 0;
 
@@ -418,6 +523,25 @@ int cam_cci_parse_dt_info(struct platform_device *pdev,
 	}
 
 	new_cci_dev->ref_count = 0;
+
+	/* Select the two CCU mux bits associated with this CCI cell-index. */
+	if (new_cci_dev->hw_info &&
+	    new_cci_dev->hw_info->variant == CAM_CCI_HW_CCU_LEGACY) {
+		rc = cam_cci_get_ccu_mux_mask(new_cci_dev->soc_info.index,
+			&new_cci_dev->cci_mux_mask);
+		if (rc) {
+			CAM_ERR(CAM_CCI,
+				"CCI%d: invalid cell-index for CCU legacy CCI",
+				new_cci_dev->soc_info.index);
+			return rc;
+		}
+		CAM_DBG(CAM_CCI,
+			"CCI%d: CCU variant=%d mux_mask=0x%x mux_off=0x%x",
+			new_cci_dev->soc_info.index,
+			new_cci_dev->hw_info->variant,
+			new_cci_dev->cci_mux_mask,
+			new_cci_dev->hw_info->mux_offset);
+	}
 
 	for (i = 0; i < soc_info->irq_count; i++)
 		irq_data[i] = new_cci_dev;
@@ -525,6 +649,10 @@ int cam_cci_soc_release(struct cci_device *cci_dev,
 
 	cci_dev->cci_state = CCI_STATE_DISABLED;
 	cci_dev->cycles_per_us = 0;
+
+	if (cci_dev->hw_info &&
+	    cci_dev->hw_info->variant == CAM_CCI_HW_CCU_LEGACY)
+		cam_cci_clear_ccu_cci_path(cci_dev);
 
 	cam_cpas_stop(cci_dev->cpas_handle);
 

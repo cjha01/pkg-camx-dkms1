@@ -41,6 +41,7 @@
 #define CSIPHY_VERSION_V220                       0x220
 #define CSIPHY_VERSION_V221                       0x221
 #define CSIPHY_VERSION_V230                       0x230
+#define CSIPHY_VERSION_V250                       0x250
 
 /**
  * @csiphy_dev: CSIPhy device structure
@@ -82,8 +83,10 @@ int cam_csiphy_reg_dump(struct cam_hw_soc_info *soc_info);
 
 /**
  * @csiphy_dev: CSIPhy device structure
+ * @dump_to_log: Write dump to kernel log
  *
  * This API dumps memory for the entire status region
  */
-int32_t cam_csiphy_common_status_reg_dump(struct csiphy_device *csiphy_dev);
+int32_t cam_csiphy_common_status_reg_dump(struct csiphy_device *csiphy_dev,
+	bool dump_to_log);
 #endif /* _CAM_CSIPHY_SOC_H_ */

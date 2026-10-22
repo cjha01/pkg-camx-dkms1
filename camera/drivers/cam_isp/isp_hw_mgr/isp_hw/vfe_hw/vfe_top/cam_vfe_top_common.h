@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_VFE_TOP_COMMON_H_
 #define _CAM_VFE_TOP_COMMON_H_
 
-#define CAM_VFE_TOP_MUX_MAX 7
+#define CAM_VFE_TOP_MUX_MAX 13
 
 #include "cam_cpas_api.h"
 #include "cam_vfe_hw_intf.h"
@@ -30,8 +30,6 @@ struct cam_vfe_top_priv_common {
 	unsigned long                   last_clk_vote[CAM_DELAY_CLK_BW_REDUCTION_NUM_REQ];
 	uint32_t                        last_clk_counter;
 	uint64_t                        total_bw_applied;
-	enum cam_clk_bw_state           clk_state;
-	enum cam_clk_bw_state           bw_state;
 	uint32_t                        hw_version;
 	enum cam_isp_bw_control_action  axi_vote_control[CAM_VFE_TOP_MUX_MAX];
 	struct cam_hw_soc_info         *soc_info;

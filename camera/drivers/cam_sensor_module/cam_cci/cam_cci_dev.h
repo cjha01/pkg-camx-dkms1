@@ -62,7 +62,13 @@
 
 #define CAM_CCI_WORKQUEUE_NAME "cam_cci_wq"
 
-#define MAX_CCI 4
+#define MAX_CCI 5
+
+#define CAM_CCI_CCU_MUX_CCI0_MASK (BIT(0) | BIT(1))
+#define CAM_CCI_CCU_MUX_CCI1_MASK (BIT(2) | BIT(3))
+#define CAM_CCI_CCU_MUX_CCI2_MASK (BIT(4) | BIT(5))
+#define CAM_CCI_CCU_MUX_CCI3_MASK (BIT(6) | BIT(7))
+#define CAM_CCI_CCU_MUX_CCI4_MASK (BIT(8) | BIT(9))
 
 #define PRIORITY_QUEUE (QUEUE_0)
 #define SYNC_QUEUE (QUEUE_1)
@@ -190,6 +196,30 @@ struct cci_sysfs {
 #endif /*CONFIG_SPECTRA_SENSOR_SYSFS_UTIL*/
 
 /**
+ * enum cam_cci_hw_variant - CCU/CCI hardware variant
+ * @CAM_CCI_HW_STANDALONE : Legacy CCI, no CCU wrapper (Lemans, etc.)
+ * @CAM_CCI_HW_CCU_LEGACY : Legacy CCI inside CCU wrapper (nordschleife)
+ * @CAM_CCI_HW_CCU_QUP    : QuP I2C inside CCU wrapper (future)
+ */
+enum cam_cci_hw_variant {
+	CAM_CCI_HW_STANDALONE = 0,
+	CAM_CCI_HW_CCU_LEGACY,
+	CAM_CCI_HW_CCU_QUP,
+};
+
+/**
+ * struct cam_cci_hw_info - per-compatible hardware descriptor
+ * @variant         : hardware variant
+ * @max_masters     : number of I2C masters (2 for CCI, 5 for QUP SE)
+ * @mux_offset      : CAMERA_TOP CCU_O_MUX_SEL offset (0 if not applicable)
+ */
+struct cam_cci_hw_info {
+	enum cam_cci_hw_variant variant;
+	uint8_t  max_masters;
+	uint32_t mux_offset;
+};
+
+/**
  * struct cci_device
  * @pdev:                       Platform device
  * @subdev:                     V4L2 sub device
@@ -261,6 +291,8 @@ struct cci_device {
 	struct mutex init_mutex;
 	uint64_t  dump_en;
 	bool is_probing;
+	const struct cam_cci_hw_info *hw_info;
+	uint32_t cci_mux_mask;
 #ifdef CONFIG_SPECTRA_SENSOR_SYSFS_UTIL
 	struct cci_sysfs cci_master_sysfs[MASTER_MAX];
 	int32_t num_masters;

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CSIPHY_DEV_H_
@@ -58,12 +58,46 @@
 #define CSIPHY_DNP_PARAMS                BIT(14)
 
 #define CSIPHY_MAX_INSTANCES_PER_PHY           3
+#define CSIPHY_2PH_SEC_CLK_LN_SETTINGS   BIT(15)
+#define CSIPHY_2PH_QMARGIN_DATA          BIT(16)
+#define CSIPHY_CDR_COARSE_LN_SETTINGS    BIT(17)
+#define CSIPHY_EQ_LN_SETTINGS            BIT(18)
+#define CSIPHY_EQ2_LN_SETTINGS           BIT(19)
+#define CSIPHY_BUFFER_EQ_LN_SETTINGS     BIT(20)
+#define CSIPHY_LOFREQ_EQ_LN_SETTINGS     BIT(21)
+
+#define CSIPHY_QMARGIN_FIELD_SHIFT       28
+#define CSIPHY_QMARGIN_FIELD_MASK        (0xFU << CSIPHY_QMARGIN_FIELD_SHIFT)
+
+enum csiphy_qmargin_field_id {
+	CSIPHY_QMARGIN_FIELD_PGM_DELAY  = 1,
+	CSIPHY_QMARGIN_FIELD_DESKEW_CAL_MODE  = 2,
+	CSIPHY_QMARGIN_FIELD_DESKEW_CAL_OFFSET  = 3,
+	CSIPHY_QMARGIN_FIELD_DESKEW_CAL_LIMIT  = 4,
+};
+
+#define CSIPHY_2PH_QMARGIN_PGM_DELAY \
+	(CSIPHY_2PH_QMARGIN_DATA | \
+	 (CSIPHY_QMARGIN_FIELD_PGM_DELAY << CSIPHY_QMARGIN_FIELD_SHIFT))
+#define CSIPHY_2PH_QMARGIN_DESKEW_CAL_MODE \
+	(CSIPHY_2PH_QMARGIN_DATA | \
+	 (CSIPHY_QMARGIN_FIELD_DESKEW_CAL_MODE << CSIPHY_QMARGIN_FIELD_SHIFT))
+#define CSIPHY_2PH_QMARGIN_DESKEW_CAL_OFFSET \
+	(CSIPHY_2PH_QMARGIN_DATA | \
+	 (CSIPHY_QMARGIN_FIELD_DESKEW_CAL_OFFSET << CSIPHY_QMARGIN_FIELD_SHIFT))
+#define CSIPHY_2PH_QMARGIN_DESKEW_CAL_LIMIT \
+	(CSIPHY_2PH_QMARGIN_DATA | \
+	 (CSIPHY_QMARGIN_FIELD_DESKEW_CAL_LIMIT << CSIPHY_QMARGIN_FIELD_SHIFT))
+
 #define CSIPHY_MAX_INSTANCES_PER_AGGREG_RX_PHY 6
 
 #define CAM_CSIPHY_MAX_DPHY_LANES            4
+#define CAM_CSIPHY_MAX_DPHY_DL_CLK_LANES     5
 #define CAM_CSIPHY_MAX_CPHY_LANES            3
+#define CAM_CSIPHY_MAX_DPHY_CLK_LANES        2
 #define CAM_CSIPHY_MAX_CPHY_DPHY_COMBO_LN    3
 #define CAM_CSIPHY_MAX_DATARATE_VARIANTS     3
+#define CSIPHY_QMARGIN_CMN_STATUS_REG_COUNT  11
 
 #define DPHY_LANE_0    BIT(0)
 #define CPHY_LANE_0    BIT(1)
@@ -155,6 +189,8 @@ struct cam_csiphy_aon_sel_params_t {
 struct cam_cphy_dphy_status_reg_params_t {
 	uint32_t csiphy_3ph_status0_offset;
 	uint32_t csiphy_2ph_status0_offset;
+	uint32_t csiphy_2ph_cal_status_offset;
+	uint32_t csiphy_2ph_cal_code_offset;
 	uint32_t cphy_lane_status[CAM_CSIPHY_MAX_CPHY_LANES];
 	uint16_t csiphy_3ph_status_size;
 	uint16_t csiphy_2ph_status_size;
@@ -394,6 +430,90 @@ struct cam_csiphy_dev_aux_setting_params {
 };
 
 /**
+ * struct csiphy_qmargin_csid_output
+ *
+ * @csi2_rx_status       : RX status register value of CSID PHY is
+ *                         connected to
+ * @csi2_rx_status_2     : CSI2 RX status 2 register value
+ * @csi2_total_crc_err   : Total CRC errors seen by CSID while
+ *                         streaming
+ * @csi2_total_pkts_rcvd : Total packets received by CSID while
+ *                         streaming
+ * @csi2_err_seen        : If CSID receiver encountered error(s)
+ *                         while streaming
+ * @epd_enabled          : If EPD was enabled for stream
+ */
+struct csiphy_qmargin_csid_output {
+	uint32_t csi2_rx_status;
+	uint32_t csi2_rx_status_2;
+	uint32_t csi2_total_crc_err;
+	uint32_t csi2_total_pkts_rcvd;
+	bool csi2_err_seen;
+	bool epd_enabled;
+};
+
+/**
+ * struct csiphy_dphy_qmargin_config - Per-lane 2-phase (DPHY) qmargin config
+ *
+ * @regs            : Register definition (addr, data, delay, param_type)
+ * @lane_idx        : Lane index (0-3 for data lanes, 4 for clock lane)
+ * @is_2ph_clk_lane : 1 if this is a clock lane, 0 if data lane
+ * @is_lane_enable  : 1 if this lane is enabled/active
+ */
+struct csiphy_dphy_qmargin_config {
+	struct csiphy_reg_t regs;
+	uint32_t lane_idx;
+	bool is_2ph_clk_lane;
+	bool is_lane_enable;
+};
+
+/**
+ * struct csiphy_qmargin_sweep_data
+ *
+ * @qmargin_csid_output         : Set of CSID register values sent over
+ *                                by CSID through cam_subdev_notify_message
+ * @cdr_regs                    : Default Fine CDR values needed by Qmargin (3-phase)
+ * @coarse_cdr_regs             : Default Coarse CDR values needed by Qmargin (3-phase)
+ * @eq_regs                     : Default EQ/EQ1 values needed by Qmargin (3-phase)
+ * @eq2_regs                    : Default EQ2 values needed by Qmargin (3-phase, GHP/212 only)
+ * @buffer_eq_regs              : Default Buffer EQ values needed by Qmargin (3-phase, GHP/212 only)
+ * @lofreq_eq_regs               : Default LoFREQ_EQ values needed by Qmargin (3-phase)
+ * @csiphy_qmargin_output_regs  : Register values needed by Qmargin to
+ *                                determine sweep results
+ * @bw                          : BW at which PHY is streaming at (3-phase)
+ * @pgm_delay                   : PGM delay config for data and clock lanes (2-phase)
+ * @deskew_cal_mode               : Deskew CTRL23 config per lane (2-phase)
+ * @deskew_cal_offset               : Deskew CTRL24 config per lane (2-phase)
+ * @deskew_cal_limit               : Deskew CTRL25 config per lane (2-phase)
+ * @is_combo_mode               : 1 if operating in combo mode
+ * @lane_cnt                    : number of active DPHY lanes
+ * @ln_2ph_calibration_status   : 2PHASE_STATUS8 per DPHY lane (indices 0-3 for
+ *                                data lanes, index 4 for clock lane)
+ * @ln_2ph_deskew_cal_code       : 2PHASE_STATUS9 per DPHY lane (indices 0-3 for
+ *                                data lanes, index 4 for clock lane)
+ */
+struct csiphy_qmargin_sweep_data {
+	struct csiphy_qmargin_csid_output qmargin_csid_output;
+	struct csiphy_reg_t cdr_regs[CAM_CSIPHY_MAX_CPHY_LANES];
+	struct csiphy_reg_t coarse_cdr_regs[CAM_CSIPHY_MAX_CPHY_LANES];
+	struct csiphy_reg_t eq_regs[CAM_CSIPHY_MAX_CPHY_LANES];
+	struct csiphy_reg_t eq2_regs[CAM_CSIPHY_MAX_CPHY_LANES];
+	struct csiphy_reg_t buffer_eq_regs[CAM_CSIPHY_MAX_CPHY_LANES];
+	struct csiphy_reg_t lofreq_eq_regs[CAM_CSIPHY_MAX_CPHY_LANES];
+	unsigned int csiphy_qmargin_output_regs[
+		CSIPHY_QMARGIN_CMN_STATUS_REG_COUNT];
+	uint64_t bw;
+	struct csiphy_dphy_qmargin_config pgm_delay[CAM_CSIPHY_MAX_DPHY_DL_CLK_LANES];
+	struct csiphy_dphy_qmargin_config deskew_cal_mode[CAM_CSIPHY_MAX_DPHY_DL_CLK_LANES];
+	struct csiphy_dphy_qmargin_config deskew_cal_offset[CAM_CSIPHY_MAX_DPHY_DL_CLK_LANES];
+	struct csiphy_dphy_qmargin_config deskew_cal_limit[CAM_CSIPHY_MAX_DPHY_DL_CLK_LANES];
+	uint32_t is_combo_mode;
+	uint8_t  lane_cnt;
+	uint32_t ln_2ph_calibration_status[CAM_CSIPHY_MAX_DPHY_DL_CLK_LANES];
+	uint32_t ln_2ph_deskew_cal_code[CAM_CSIPHY_MAX_DPHY_DL_CLK_LANES];
+};
+
+/**
  * struct csiphy_device
  * @device_name                : Device name
  * @mutex                      : ioctl operation mutex
@@ -423,6 +543,7 @@ struct cam_csiphy_dev_aux_setting_params {
  * @crm_cb                     : Callback API pointers
  * @cdr_params                 : CDR sweep params
  * @aux_params                 : AUX settings buffer params
+ * @qmargin_data               : Qmargin params
  * @prgm_cmn_reg_across_csiphy : Flag to decide if com settings need to be programmed for all PHYs
  * @en_common_status_reg_dump  : Debugfs flag to enable common status register dump
  * @en_lane_status_reg_dump    : Debugfs flag to enable cphy/dphy lane status dump
@@ -463,6 +584,7 @@ struct csiphy_device {
 	struct cam_req_mgr_crm_cb               *crm_cb;
 	struct cam_csiphy_dev_cdr_sweep_params   cdr_params;
 	struct cam_csiphy_dev_aux_setting_params aux_params;
+	struct csiphy_qmargin_sweep_data         qmargin_data;
 	bool                                     prgm_cmn_reg_across_csiphy;
 	bool                                     en_common_status_reg_dump;
 	bool                                     en_lane_status_reg_dump;

@@ -30,6 +30,35 @@ static struct cci_irq_data cci_irq_queue[QUEUE_SIZE] = { 0 };
 static int32_t head;
 static int32_t tail;
 
+
+/*
+ * Hardware descriptor instances — one per compatible string.
+ * All register offsets are relative to the CAMERA_TOP (CPAS TOP) base,
+ * which is the base used by cam_cpas_reg_write(CAM_CPAS_REGBASE_CPASTOP).
+ *
+ * nordschleife_2.0 offsets (from IPCAT SWI):
+ *   CAMERA_TOP base : 0x09a01000
+ *   mux_offset      = 0x00ec  (CCU_O_MUX_SEL in CAMERA_TOP)
+ */
+static const struct cam_cci_hw_info cam_cci_hw_info_standalone = {
+	.variant         = CAM_CCI_HW_STANDALONE,
+	.max_masters     = 2,
+	.mux_offset      = 0,
+};
+
+static const struct cam_cci_hw_info cam_cci_hw_info_ccu_legacy = {
+	.variant         = CAM_CCI_HW_CCU_LEGACY,
+	.max_masters     = 2,
+	.mux_offset      = 0xec,
+};
+
+static const struct cam_cci_hw_info cam_cci_hw_info_ccu_qup = {
+	.variant         = CAM_CCI_HW_CCU_QUP,
+	.max_masters     = 5,     /* 5 Serial Engines per QUP instance */
+	.mux_offset      = 0xec,
+};
+
+
 static inline int32_t increment_index(int32_t index)
 {
 	return (index + 1) % QUEUE_SIZE;
@@ -60,7 +89,9 @@ static long cam_cci_subdev_ioctl(struct v4l2_subdev *sd,
 
 	switch (cmd) {
 	case VIDIOC_MSM_CCI_CFG:
-		rc = cam_cci_core_cfg(sd, arg);
+		CAM_ERR_RATE_LIMIT(CAM_CCI,
+			"VIDIOC_MSM_CCI_CFG via ioctl is not supported");
+		rc = -EOPNOTSUPP;
 		break;
 	case VIDIOC_CAM_CONTROL:
 		break;
@@ -712,11 +743,25 @@ static int cam_cci_component_bind(struct device *dev,
 	soc_info->dev = &pdev->dev;
 	soc_info->dev_name = pdev->name;
 
-	rc = cam_cci_parse_dt_info(pdev, new_cci_dev);
+	new_cci_dev->hw_info = of_device_get_match_data(&pdev->dev);
+	if (!new_cci_dev->hw_info) {
+		CAM_ERR(CAM_CCI, "CCI: no hw_info for compatible string");
+		goto cci_no_resource;
+	}
+	if (new_cci_dev->hw_info->variant == CAM_CCI_HW_CCU_QUP) {
+		CAM_INFO(CAM_CCI, "CCU QUP I2C path is not supported");
+		return -EOPNOTSUPP;
+	}
+
+	rc = cam_cci_parse_dt_info(new_cci_dev);
 	if (rc < 0) {
 		CAM_ERR(CAM_CCI, "Resource get Failed rc:%d", rc);
 		goto cci_no_resource;
 	}
+
+	CAM_DBG(CAM_CCI, "CCI%d: hw variant=%d",
+		new_cci_dev->soc_info.index,
+		new_cci_dev->hw_info->variant);
 
 	new_cci_dev->v4l2_dev_str.internal_ops =
 		&cci_subdev_intern_ops;
@@ -849,7 +894,15 @@ static void cam_cci_device_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id cam_cci_dt_match[] = {
-	{.compatible = "qcom,cci"},
+	/* Standalone legacy CCI — existing SoCs (Lemans, etc.) */
+	{ .compatible = "qcom,cci",
+	  .data = &cam_cci_hw_info_standalone },
+	/* CCU wrapper — legacy CCI path (Auto SoCs, nordschleife) */
+	{ .compatible = "qcom,ccu-cci",
+	  .data = &cam_cci_hw_info_ccu_legacy },
+	/* CCU wrapper — QuP I2C path (future) */
+	{ .compatible = "qcom,ccu-qup-i2c",
+	  .data = &cam_cci_hw_info_ccu_qup },
 	{}
 };
 

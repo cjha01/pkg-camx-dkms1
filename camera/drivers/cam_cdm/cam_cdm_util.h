@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CDM_UTIL_H_
@@ -29,7 +29,9 @@ enum cam_cdm_command {
 	CAM_CDM_CMD_COMP_WAIT = 0xc,
 	CAM_CDM_CLEAR_COMP_WAIT = 0xd,
 	CAM_CDM_WAIT_PREFETCH_DISABLE = 0xe,
-	CAM_CDM_CMD_PRIVATE_BASE = 0xf,
+	CAM_CDM_CMD_NB_WAIT = 0xf,
+	CAM_CDM_CMD_NB_WAIT_GEN_IRQ = 0x10,
+	CAM_CDM_CMD_PRIVATE_BASE = 0x11,
 	CAM_CDM_CMD_SWD_DMI_32 = (CAM_CDM_CMD_PRIVATE_BASE + 0x64),
 	CAM_CDM_CMD_SWD_DMI_64 = (CAM_CDM_CMD_PRIVATE_BASE + 0x65),
 	CAM_CDM_CMD_PRIVATE_BASE_MAX = 0x7F,
@@ -174,6 +176,7 @@ void (*cdm_write_genirq)(
 	uint32_t *pCmdBuffer,
 	uint32_t  userdata,
 	bool      bit_wr_enable,
+	bool      has_per_ctx_usr_data,
 	uint32_t  fifo_idx);
 uint32_t *(*cdm_write_wait_event)(
 	uint32_t *pCmdBuffer,
@@ -194,6 +197,18 @@ uint32_t *(*cdm_write_clear_comp_event)(
 	uint32_t  mask1,
 	uint32_t  mask2);
 uint32_t *(*cdm_write_wait_prefetch_disable)(
+	uint32_t *pCmdBuffer,
+	uint32_t  id,
+	uint32_t  mask1,
+	uint32_t  mask2);
+uint32_t (*cdm_required_size_nb_wait)(void);
+uint32_t (*cdm_required_size_nb_wait_gen_irq)(void);
+uint32_t *(*cdm_write_nb_wait)(
+	uint32_t *pCmdBuffer,
+	uint32_t  id,
+	uint32_t  mask1,
+	uint32_t  mask2);
+uint32_t *(*cdm_write_nb_wait_gen_irq)(
 	uint32_t *pCmdBuffer,
 	uint32_t  id,
 	uint32_t  mask1,

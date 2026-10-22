@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
 #include <linux/of_device.h>
+#include <linux/firmware.h>
 
 #include "camera_main.h"
 #include "cam_debug_util.h"
@@ -17,9 +18,9 @@
 #include "cam_icp_soc_common.h"
 #include "cam_icp_v2_dev.h"
 #include "cam_icp_proc.h"
+#include "cam_icp_subdev.h"
 
 static int max_icp_v2_hw_idx = -1;
-extern struct camera_firmware cam_fw;
 
 struct cam_icp_v2_hw_info cam_icp_v2_hw_info[] = {
 	{
@@ -172,11 +173,20 @@ static int cam_icp_v2_component_bind(struct device *dev,
 	if ((int)(icp_v2_intf->hw_idx) > max_icp_v2_hw_idx)
 		max_icp_v2_hw_idx = icp_v2_intf->hw_idx;
 
+	core_info->fw = cam_icp_subdev_get_fw(icp_v2_intf->hw_idx);
+	if (!core_info->fw) {
+		CAM_ERR(CAM_ICP, "Invalid hw_idx: %u for FW instance lookup",
+			icp_v2_intf->hw_idx);
+		rc = -EINVAL;
+		goto cpas_unregister;
+	}
+
 	platform_set_drvdata(pdev, icp_v2_intf);
 
-	core_info->fw = &cam_fw;
 	return 0;
 
+cpas_unregister:
+	cam_icp_v2_cpas_unregister(icp_v2_intf);
 res_deinit:
 	cam_icp_soc_resources_deinit(&icp_v2_info->soc_info);
 free_soc_info:
@@ -197,6 +207,7 @@ static void cam_icp_v2_component_unbind(struct device *dev,
 	struct platform_device *pdev = to_platform_device(dev);
 	struct cam_hw_intf *icp_v2_intf = NULL;
 	struct cam_hw_info *icp_v2_info = NULL;
+	struct cam_icp_v2_core_info *core_info = NULL;
 
 	icp_v2_intf = platform_get_drvdata(pdev);
 
@@ -206,12 +217,19 @@ static void cam_icp_v2_component_unbind(struct device *dev,
 	}
 
 	icp_v2_info = icp_v2_intf->hw_priv;
+	core_info = (struct cam_icp_v2_core_info *)icp_v2_info->core_info;
 
 	cam_icp_v2_cpas_unregister(icp_v2_intf);
 	cam_icp_soc_resources_deinit(&icp_v2_info->soc_info);
 	cam_icp_v2_soc_info_deinit(&icp_v2_info->soc_info);
 
 	max_icp_v2_hw_idx = -1;
+
+	if (core_info->fw_cache.loaded && core_info->fw_cache.fw) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+		core_info->fw_cache.loaded = false;
+	}
 
 	kfree(icp_v2_info->core_info);
 	kfree(icp_v2_info);

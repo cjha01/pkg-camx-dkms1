@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_ISP_HW_MGR_H_
@@ -12,7 +12,8 @@
 #include "cam_tasklet_util.h"
 #include "cam_isp_hw.h"
 
-#define CAM_ISP_HW_NUM_MAX                       8
+/* Must stay in lockstep with CAM_IFE_HW_NUM_MAX (16) */
+#define CAM_ISP_HW_NUM_MAX                       16
 #define CAM_ISP_IN_SENSOR_ID_UNKNOWN             0xdeadbeef
 #define CAM_IFE_STREAM_GRP_INDEX_NONE            0xdeadbeef
 /**
@@ -80,7 +81,6 @@ struct cam_isp_hw_mgr {
  * @dt:                  input data type number
  * @use_wm_pack:         Flag to indicate if WM is to be used for packing
  * @hw_ctxt_id:          HW context ID mask corresponding to this resource
- * @linked:              Indicates if this hw res to linked to any ife context
  * @decode_format        input data format
  *
  */
@@ -96,7 +96,6 @@ struct cam_isp_hw_mgr_res {
 	uint32_t                         dt;
 	bool                             use_wm_pack;
 	uint32_t                         hw_ctxt_id_mask;
-	bool                             linked;
 	uint32_t                         decode_format;
 };
 

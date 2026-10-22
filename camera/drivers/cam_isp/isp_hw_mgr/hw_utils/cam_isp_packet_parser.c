@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <media/cam_defs.h>
@@ -12,6 +12,7 @@
 #include "cam_isp_packet_parser.h"
 #include "cam_debug_util.h"
 #include "cam_isp_hw_mgr_intf.h"
+#include "cam_ife_hw_mgr.h"
 
 int cam_isp_count_hw_entries(struct cam_hw_prepare_update_args *prepare)
 {
@@ -800,8 +801,7 @@ static int cam_isp_get_outport_res_id(
 	prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *)
 			prepare->priv;
 
-	if ((io_cfg->resource_type >= CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI0 &&
-		io_cfg->resource_type <= CAM_ISP_IFE_OUT_RES_VIRTUAL_RDI5) &&
+	if (cam_ife_hw_mgr_is_virtual_rdi_out_res(io_cfg->resource_type) &&
 		prepare_hw_data->per_port_enable) {
 		if (prepare_hw_data->virtual_rdi_mapping_cb) {
 			out_port = prepare_hw_data->virtual_rdi_mapping_cb(priv,
@@ -1279,6 +1279,11 @@ int cam_isp_add_io_buffers(struct cam_isp_io_buf_info   *io_info)
 	major_version = io_info->major_version;
 
 	if (major_version == 3) {
+		if (max_out_res == 0) {
+			CAM_ERR(CAM_ISP, "Invalid max_out_res: 0");
+			return -EINVAL;
+		}
+
 		mc_cfg = vzalloc(sizeof(uint64_t) * CAM_ISP_MULTI_CTXT_MAX * (max_out_res));
 		if (!mc_cfg) {
 			CAM_ERR(CAM_ISP, "Memory allocation failed for MC cases");
@@ -1291,11 +1296,21 @@ int cam_isp_add_io_buffers(struct cam_isp_io_buf_info   *io_info)
 
 		if (major_version == 3) {
 			ctxt_id = ffs(io_cfg[i].flag) - 1;
-			if (ctxt_id < 0) {
+			if (ctxt_id < 0 || ctxt_id >= CAM_ISP_MULTI_CTXT_MAX) {
 				CAM_ERR(CAM_ISP,
-					"Invalid ctxt_id %d req_id %llu resource_type:%d",
-					ctxt_id, io_info->prepare->packet->header.request_id,
-					io_cfg[i].resource_type);
+						"Invalid ctxt_id %d (valid: 0-%d) req_id %llu resource_type:%d",
+						ctxt_id, CAM_ISP_MULTI_CTXT_MAX - 1,
+						io_info->prepare->packet->header.request_id,
+						io_cfg[i].resource_type);
+				rc = -EINVAL;
+				goto err;
+			}
+
+			/* Validate array bounds before access */
+			if (num_ports[ctxt_id] >= max_out_res) {
+				CAM_ERR(CAM_ISP,
+						"Port count %u exceeds max_out_res %u for ctxt_id %d",
+						num_ports[ctxt_id], max_out_res, ctxt_id);
 				rc = -EINVAL;
 				goto err;
 			}
@@ -1381,7 +1396,9 @@ int cam_isp_add_io_buffers(struct cam_isp_io_buf_info   *io_info)
 
 	return rc;
 err:
-	vfree(mc_cfg);
+	if (mc_cfg)
+		vfree(mc_cfg);
+
 	return rc;
 }
 
