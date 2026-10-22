@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef CAM_A5_CORE_H
@@ -11,6 +12,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include "cam_a5_hw_intf.h"
+#include "cam_icp_util.h"
 
 #define A5_QGIC_BASE            0
 #define A5_SIERRA_BASE          1
@@ -46,22 +48,19 @@ struct cam_a5_device_hw_info {
 };
 
 /**
- * struct cam_a5_device_hw_info
+ * struct cam_a5_device_core_info
  * @a5_hw_info: A5 hardware info
- * @fw_elf: start address of fw start with elf header
- * @fw: start address of fw blob
  * @fw_buf: smmu alloc/mapped fw buffer
  * @fw_buf_len: fw buffer length
  * @query_cap: A5 query info from firmware
  * @a5_acquire: Acquire information of A5
  * @irq_cb: IRQ callback
  * @cpas_handle: CPAS handle for A5
- * @cpast_start: state variable for cpas
+ * @cpas_start: state variable for cpas
+ * @fw_cache: cached fw blob; reused across multiple icp subdev open call
  */
 struct cam_a5_device_core_info {
 	struct cam_a5_device_hw_info *a5_hw_info;
-	const struct firmware *fw_elf;
-	void *fw;
 	uint32_t fw_buf;
 	uintptr_t fw_kva_addr;
 	uint64_t fw_buf_len;
@@ -70,6 +69,7 @@ struct cam_a5_device_core_info {
 	struct cam_icp_set_irq_cb irq_cb;
 	uint32_t cpas_handle;
 	bool cpas_start;
+	struct cam_icp_fw_cache fw_cache;
 };
 
 int cam_a5_init_hw(void *device_priv,

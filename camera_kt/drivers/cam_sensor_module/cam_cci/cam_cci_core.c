@@ -11,6 +11,207 @@
 #include "cam_req_mgr_workq.h"
 #include "cam_common_util.h"
 
+#define CCI_MASTER_LOCK_TIMEOUT msecs_to_jiffies(1000)
+#define CCI_MASTER_LOCK_WAIT_RETRY_COUNT	3
+
+enum cci_lock_result {
+	CCI_LOCK_GRANTED,
+	CCI_LOCK_WAIT,
+	CCI_LOCK_ERROR,
+};
+
+static bool cam_cci_lock_wait_cond(struct cam_cci_master_info *mi, enum cam_cci_cmd_type cmd)
+{
+	/* wait if the cmd is read_ap_write or seq. lock, until the master is available again */
+	if (cmd == MSM_CCI_I2C_READ_APPEND_WRITE || cmd == MSM_CCI_I2C_SEQUENTIAL_XFER_LOCK)
+		return (mi->master_usage_cnt == 0);
+
+	return (!mi->is_master_locked);
+}
+
+static enum cci_lock_result cam_cci_master_acquire(struct cam_cci_master_info *mi,
+		struct cam_cci_ctrl *cci_ctrl, enum cam_cci_cmd_type cmd, bool force_unlock)
+{
+	bool is_master_owned = cci_ctrl->cci_info->is_master_owned;
+
+	switch (cmd) {
+	case MSM_CCI_I2C_READ:
+	case MSM_CCI_I2C_WRITE:
+	case MSM_CCI_I2C_WRITE_SEQ:
+	case MSM_CCI_I2C_WRITE_BURST:
+	case MSM_CCI_I2C_WRITE_SYNC:
+	case MSM_CCI_I2C_WRITE_ASYNC:
+	case MSM_CCI_I2C_WRITE_SYNC_BLOCK:
+		if (!mi->is_master_locked || is_master_owned) {
+			mi->master_usage_cnt++;
+			return CCI_LOCK_GRANTED;
+		}
+
+		return CCI_LOCK_WAIT;
+
+	case MSM_CCI_I2C_READ_APPEND_WRITE:
+		if (mi->is_master_locked && is_master_owned && !mi->is_read_append_locked) {
+			mi->master_usage_cnt++;
+			return CCI_LOCK_GRANTED;
+		}
+
+		if (!mi->is_master_locked && mi->master_usage_cnt == 0) {
+			mi->is_master_locked = TRUE;
+			mi->is_read_append_locked = TRUE;
+			cci_ctrl->cci_info->is_master_owned = TRUE;
+			mi->master_usage_cnt++;
+			return CCI_LOCK_GRANTED;
+		}
+
+		return (mi->master_usage_cnt > 0 || !is_master_owned) ?
+			CCI_LOCK_WAIT : CCI_LOCK_ERROR;
+
+	case MSM_CCI_I2C_SEQUENTIAL_XFER_LOCK:
+		if (mi->is_master_locked && is_master_owned)
+			return CCI_LOCK_ERROR;
+
+		if (!mi->is_master_locked && mi->master_usage_cnt == 0) {
+			mi->is_master_locked = TRUE;
+			cci_ctrl->cci_info->is_master_owned = TRUE;
+			mi->master_usage_cnt++;
+			return CCI_LOCK_GRANTED;
+		}
+
+		return (mi->master_usage_cnt > 0) ? CCI_LOCK_WAIT : CCI_LOCK_ERROR;
+
+	case MSM_CCI_I2C_SEQUENTIAL_XFER_UNLOCK:
+		if (mi->is_master_locked && is_master_owned && mi->master_usage_cnt == 1) {
+			mi->is_master_locked = FALSE;
+			cci_ctrl->cci_info->is_master_owned = FALSE;
+			mi->master_usage_cnt--;
+
+			if (mi->master_usage_cnt == 0)
+				wake_up(&mi->lock_wait);
+
+			return CCI_LOCK_GRANTED;
+		}
+		/* force_unlock is best-effort: nothing to undo is not an error */
+		return force_unlock ? CCI_LOCK_GRANTED : CCI_LOCK_ERROR;
+
+	default:
+		break;
+	}
+
+	return CCI_LOCK_GRANTED;
+}
+
+/* Called with master_lock_mutex held. */
+static int32_t cam_cci_master_release(struct cam_cci_master_info *mi,
+		struct cam_cci_ctrl *cci_ctrl, enum cam_cci_cmd_type cmd)
+{
+	bool is_master_owned = cci_ctrl->cci_info->is_master_owned;
+
+	switch (cmd) {
+	case MSM_CCI_I2C_READ:
+	case MSM_CCI_I2C_WRITE:
+	case MSM_CCI_I2C_WRITE_SEQ:
+	case MSM_CCI_I2C_WRITE_BURST:
+	case MSM_CCI_I2C_WRITE_SYNC:
+	case MSM_CCI_I2C_WRITE_ASYNC:
+	case MSM_CCI_I2C_WRITE_SYNC_BLOCK:
+		if (!mi->is_master_locked || is_master_owned || mi->master_usage_cnt) {
+			mi->master_usage_cnt--;
+			if (mi->master_usage_cnt == 0)
+				wake_up(&mi->lock_wait);
+			return 0;
+		}
+		return -EINVAL;
+
+	case MSM_CCI_I2C_READ_APPEND_WRITE:
+		if (mi->is_master_locked && is_master_owned && !mi->is_read_append_locked) {
+			mi->master_usage_cnt--;
+			if (mi->master_usage_cnt == 0)
+				wake_up(&mi->lock_wait);
+			return 0;
+		}
+		if (mi->is_master_locked && is_master_owned &&
+			mi->is_read_append_locked && mi->master_usage_cnt == 1) {
+				mi->is_master_locked = FALSE;
+				mi->is_read_append_locked = FALSE;
+				cci_ctrl->cci_info->is_master_owned = FALSE;
+				mi->master_usage_cnt--;
+				wake_up(&mi->lock_wait);
+				return 0;
+		}
+		return -EINVAL;
+
+	case MSM_CCI_I2C_SEQUENTIAL_XFER_LOCK:
+	case MSM_CCI_I2C_SEQUENTIAL_XFER_UNLOCK:
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int32_t cam_cci_master_lock_handler(struct cam_cci_ctrl *cci_ctrl,
+		struct cci_device *cci_dev, bool is_entering, bool force_unlock)
+{
+	enum cci_i2c_master_t master = cci_ctrl->cci_info->cci_i2c_master;
+	struct cam_cci_master_info *mi = &cci_dev->cci_master_info[master];
+	enum cam_cci_cmd_type process_cmd;
+	enum cci_lock_result result;
+	int32_t retry_cnt = 0;
+	int32_t rc = 0;
+
+	process_cmd = force_unlock ? MSM_CCI_I2C_SEQUENTIAL_XFER_UNLOCK : cci_ctrl->cmd;
+
+	if (cci_dev->cci_state != CCI_STATE_ENABLED) {
+		CAM_WARN(CAM_CCI, "CCI is not enabled, bypassing master lock state processing");
+		return 0;
+	}
+
+	if (!is_entering) {
+		mutex_lock(&mi->master_lock_mutex);
+		rc = cam_cci_master_release(mi, cci_ctrl, process_cmd);
+		mutex_unlock(&mi->master_lock_mutex);
+		goto end_lock_handler;
+	}
+
+	mutex_lock(&mi->master_lock_mutex);
+	while (1) {
+		result = cam_cci_master_acquire(mi, cci_ctrl, process_cmd, force_unlock);
+		if (result != CCI_LOCK_WAIT)
+			break;
+
+		mutex_unlock(&mi->master_lock_mutex);
+
+		rc = wait_event_interruptible_timeout(mi->lock_wait,
+				cam_cci_lock_wait_cond(mi, process_cmd), CCI_MASTER_LOCK_TIMEOUT);
+		if (rc <= 0) {
+			CAM_ERR(CAM_CCI, "wait timeout for cmd=%d rc=%d", cci_ctrl->cmd, rc);
+			rc = -EINVAL;
+			goto end_lock_handler;
+		}
+
+		retry_cnt++;
+
+		mutex_lock(&mi->master_lock_mutex);
+	}
+
+	rc = (result == CCI_LOCK_GRANTED) ? 0 : -EINVAL;
+
+	if (retry_cnt > CCI_MASTER_LOCK_WAIT_RETRY_COUNT)
+		CAM_ERR(CAM_CCI, "loop_check_again is greater than 1 loop_check_cnt = %d",
+			retry_cnt);
+
+	mutex_unlock(&mi->master_lock_mutex);
+
+end_lock_handler:
+	if (rc < 0)
+		CAM_ERR(CAM_CCI,
+			"cmd:%d Mlocked=%d RAlocked=%d Mowned=%d MusageCnt=%d force=%d isEnter=%d",
+				cci_ctrl->cmd, mi->is_master_locked, mi->is_read_append_locked,
+				cci_ctrl->cci_info->is_master_owned, mi->master_usage_cnt,
+				force_unlock, is_entering);
+	return rc;
+}
+
 static int32_t cam_cci_convert_type_to_num_bytes(
 	enum camera_sensor_i2c_type type)
 {
@@ -1852,6 +2053,103 @@ static int32_t cam_cci_write(struct v4l2_subdev *sd,
 	return rc;
 }
 
+static uint32_t cam_cci_read_append_write_modify_bits(
+	uint32_t rd_value, uint32_t mask, uint32_t new_bits)
+{
+	CAM_DBG(CAM_CCI, "Input Args reg=0x%x, mask=0x%x, value=0x%x",
+		rd_value, mask, new_bits);
+	rd_value &= ~mask;
+	rd_value |= (new_bits & mask);
+	CAM_DBG(CAM_CCI, "Output=0x%x", rd_value);
+	return rd_value;
+}
+
+static int cam_cci_read_append_write(struct v4l2_subdev *sd,
+	struct cam_cci_ctrl *cci_ctrl)
+{
+	int32_t rc = 0;
+	struct cci_device *cci_dev = NULL;
+	enum cci_i2c_master_t master;
+	enum camera_sensor_i2c_type data_type;
+	struct cam_cci_ctrl rd_ctrl;
+	struct cam_cci_master_info *cci_master_info;
+	unsigned char buf[CAMERA_SENSOR_I2C_TYPE_DWORD];
+	uint32_t rd_data;
+
+	cci_dev = v4l2_get_subdevdata(sd);
+	if (!cci_dev || !cci_ctrl) {
+		CAM_ERR(CAM_CCI,
+			"Failed: invalid params cci_dev:%pK, c_ctrl:%pK",
+			cci_dev, cci_ctrl);
+		rc = -EINVAL;
+		return rc;
+	}
+
+	master = cci_ctrl->cci_info->cci_i2c_master;
+
+	if (cci_ctrl->cci_info->cci_i2c_master >= MASTER_MAX
+		|| cci_ctrl->cci_info->cci_i2c_master < 0) {
+		CAM_ERR(CAM_CCI, "CCI%d_I2C_M%d Invalid I2C master addr",
+			cci_dev->soc_info.index, master);
+		return -EINVAL;
+	}
+
+	cci_master_info = &cci_dev->cci_master_info[master];
+
+	CAM_DBG(CAM_CCI, "CCI%d_I2C_M%d ctrl_cmd = %d",
+		cci_dev->soc_info.index, master, cci_ctrl->cmd);
+
+	rd_ctrl.cmd = cci_ctrl->cmd;
+	rd_ctrl.cci_info = cci_ctrl->cci_info;
+	rd_ctrl.cfg.cci_i2c_read_cfg.addr =
+		cci_ctrl->cfg.cci_i2c_write_cfg.reg_setting->reg_addr;
+	rd_ctrl.cfg.cci_i2c_read_cfg.addr_type =
+		cci_ctrl->cfg.cci_i2c_write_cfg.addr_type;
+	rd_ctrl.cfg.cci_i2c_read_cfg.data_type =
+		cci_ctrl->cfg.cci_i2c_write_cfg.data_type;
+	rd_ctrl.cfg.cci_i2c_read_cfg.data = buf;
+	rd_ctrl.cfg.cci_i2c_read_cfg.num_byte =
+		cci_ctrl->cfg.cci_i2c_write_cfg.data_type;
+
+	data_type = rd_ctrl.cfg.cci_i2c_read_cfg.data_type;
+
+	rc = cam_cci_read_bytes(sd, &rd_ctrl);
+	if (rc) {
+		CAM_ERR(CAM_CCI, "Read failed, rc: %d", rc);
+		goto exit;
+	}
+
+	if (data_type == CAMERA_SENSOR_I2C_TYPE_BYTE)
+		rd_data = buf[0];
+	else if (data_type == CAMERA_SENSOR_I2C_TYPE_WORD)
+		rd_data = buf[0] << 8 | buf[1];
+	else if (data_type == CAMERA_SENSOR_I2C_TYPE_3B)
+		rd_data = buf[0] << 16 | buf[1] << 8 | buf[2];
+	else
+		rd_data = buf[0] << 24 | buf[1] << 16 |
+			buf[2] << 8 | buf[3];
+
+	CAM_DBG(CAM_CCI, "CCI read_data: 0x%x", rd_data);
+	CAM_DBG(CAM_CCI, "User reg_data before: 0x%x",
+		cci_ctrl->cfg.cci_i2c_write_cfg.reg_setting->reg_data);
+
+	cci_ctrl->cfg.cci_i2c_write_cfg.reg_setting->reg_data =
+		cam_cci_read_append_write_modify_bits(rd_data,
+			cci_ctrl->cfg.cci_i2c_write_cfg.reg_setting->data_mask,
+			cci_ctrl->cfg.cci_i2c_write_cfg.reg_setting->reg_data);
+
+	CAM_DBG(CAM_CCI, "User reg_data after: 0x%x",
+		cci_ctrl->cfg.cci_i2c_write_cfg.reg_setting->reg_data);
+
+	mutex_lock(&cci_master_info->mutex_q[SYNC_QUEUE]);
+	rc = cam_cci_i2c_write(sd, cci_ctrl,
+		SYNC_QUEUE, MSM_SYNC_DISABLE);
+	mutex_unlock(&cci_master_info->mutex_q[SYNC_QUEUE]);
+
+exit:
+	return rc;
+}
+
 int32_t cam_cci_core_cfg(struct v4l2_subdev *sd,
 	struct cam_cci_ctrl *cci_ctrl)
 {
@@ -1880,6 +2178,13 @@ int32_t cam_cci_core_cfg(struct v4l2_subdev *sd,
 		return -EAGAIN;
 	}
 	CAM_DBG(CAM_CCI, "master = %d, cmd = %d", master, cci_ctrl->cmd);
+
+	rc = cam_cci_master_lock_handler(cci_ctrl, cci_dev, TRUE, FALSE);
+	if (rc < 0) {
+		CAM_ERR(CAM_CCI, "MASTER lock state check failed for master: %d for cmd=%d",
+			master, cci_ctrl->cmd);
+		return -EINVAL;
+	}
 
 	switch (cci_ctrl->cmd) {
 	case MSM_CCI_INIT:
@@ -1917,14 +2222,37 @@ int32_t cam_cci_core_cfg(struct v4l2_subdev *sd,
 	case MSM_CCI_SET_SYNC_CID:
 		rc = cam_cci_i2c_set_sync_prms(sd, cci_ctrl);
 		break;
-
+	case MSM_CCI_I2C_READ_APPEND_WRITE:
+		rc = cam_cci_read_append_write(sd, cci_ctrl);
+		break;
+	case MSM_CCI_I2C_SEQUENTIAL_XFER_LOCK:
+	case MSM_CCI_I2C_SEQUENTIAL_XFER_UNLOCK:
+		break;
 	default:
 		rc = -ENOIOCTLCMD;
 	}
 
 	cci_ctrl->status = rc;
+	rc = cam_cci_master_lock_handler(cci_ctrl, cci_dev, FALSE, FALSE);
+	if (rc < 0) {
+		CAM_ERR(CAM_CCI, "state check last fail: master: %d, cci status=%d, cmd=%d",
+			master, cci_ctrl->status, cci_ctrl->cmd);
+		return -EINVAL;
+	}
 
-	return rc;
+	if (cci_ctrl->status) {
+		CAM_ERR(CAM_CCI, "cci status=%d for cmd=%d fail, force unblock to avoid deadlock",
+			cci_ctrl->status, cci_ctrl->cmd);
+		rc = cam_cci_master_lock_handler(cci_ctrl, cci_dev, TRUE, TRUE);
+		if (rc < 0) {
+			CAM_ERR(CAM_CCI, "state check last fail: master: %d, cci status=%d, cmd=%d",
+				master, cci_ctrl->status, cci_ctrl->cmd);
+			return -EINVAL;
+		}
+	}
+
+	//Restore the original RC status here
+	return cci_ctrl->status;
 }
 
 int32_t cam_cci_client_ops(struct v4l2_subdev *sd, unsigned int cmd,

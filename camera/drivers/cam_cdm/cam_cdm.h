@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CDM_H_
@@ -56,12 +56,12 @@
 #define CAM_CDM_INTF_MGR_MAX_SUPPORTED_CDM (CAM_CDM_HW_ID_MASK + 1)
 
 /* Number of FIFO supported on CDM */
-#define CAM_CDM_NUM_BL_FIFO 0x4
+#define CAM_CDM_NUM_BL_FIFO 0xA
 #define CAM_CDM_NUM_TEST_BUS 16
 
 /* Max number of register set for different CDM */
-#define CAM_CDM_BL_FIFO_REG_NUM 0x4
-#define CAM_CDM_BL_FIFO_IRQ_REG_NUM 0x4
+#define CAM_CDM_BL_FIFO_REG_NUM 0xA
+#define CAM_CDM_BL_FIFO_IRQ_REG_NUM 0xA
 #define CAM_CDM_BL_FIFO_PENDING_REQ_REG_NUM 0x2
 #define CAM_CDM_SCRATCH_REG_NUM 0xc
 #define CAM_CDM_COMP_WAIT_STATUS_REG_NUM 0x2
@@ -140,11 +140,18 @@
 #define CAM_CDM_IRQ_STATUS_ERROR_OVER_FLOW_MASK 0x20000
 #define CAM_CDM_IRQ_STATUS_ERROR_AHB_BUS_MASK 0x40000
 #define CAM_CDM_IRQ_STATUS_USR_DATA_MASK 0xFF
+#define CAM_CDM_IRQ_STATUS_NB_WAIT_ERR_MASK        0x80000
+#define CAM_CDM_IRQ_STATUS_EVENT_CNTR_OVERFLOW_MASK 0x100000
+#define CAM_CDM_IRQ_STATUS_INV_RTN_ARB_MASK        0x200000
+#define CAM_CDM_IRQ_STATUS_CTX_FLUSH_DONE_MASK     0x8
 
 #define CAM_CDM_IRQ_STATUS_ERRORS \
 	(CAM_CDM_IRQ_STATUS_ERROR_INV_CMD_MASK | \
 	 CAM_CDM_IRQ_STATUS_ERROR_OVER_FLOW_MASK | \
-	 CAM_CDM_IRQ_STATUS_ERROR_AHB_BUS_MASK)
+	 CAM_CDM_IRQ_STATUS_ERROR_AHB_BUS_MASK | \
+	 CAM_CDM_IRQ_STATUS_NB_WAIT_ERR_MASK | \
+	 CAM_CDM_IRQ_STATUS_EVENT_CNTR_OVERFLOW_MASK | \
+	 CAM_CDM_IRQ_STATUS_INV_RTN_ARB_MASK)
 
 /* Structure to store hw version info */
 struct cam_version_reg {
@@ -294,12 +301,14 @@ struct cam_cdm_comp_wait_status {
  * @num_bl_fifo_irq:        number of FIFO irqs in CDM
  * @num_bl_pending_req_reg: number of pending_requests register in CDM
  * @num_scratch_reg:        number of scratch registers in CDM
+ * @has_per_ctx_usr_data:   flag if cdm has usrdata register per context
  */
 struct cam_cdm_common_reg_data {
 	uint32_t num_bl_fifo;
 	uint32_t num_bl_fifo_irq;
 	uint32_t num_bl_pending_req_reg;
 	uint32_t num_scratch_reg;
+	bool has_per_ctx_usr_data;
 };
 
 /**
@@ -352,6 +361,10 @@ struct cam_cdm_common_reg_data {
  *                       and invalid commands in FIFO
  * @spare:               spare register
  * @priority_group_bit_offset offset of priority group bits
+ * @current_bl_cid:      offset to read current bl cid
+ * @arb_priority_cfg0:   offset to program bl priority cfg
+ * @arb_priority_cfg1:   offset to program bl priority cfg
+ * @usr_data_ctx:        offset of user data
  *
  */
 struct cam_cdm_common_regs {
@@ -393,6 +406,10 @@ struct cam_cdm_common_regs {
 	const struct cam_cdm_icl_regs *icl_reg;
 	uint32_t spare;
 	uint32_t priority_group_bit_offset;
+	uint32_t current_bl_cid;
+	uint32_t arb_priority_cfg0;
+	uint32_t arb_priority_cfg1;
+	const uint32_t *usr_data_ctx[CAM_CDM_BL_FIFO_REG_NUM];
 };
 
 /**
@@ -464,6 +481,8 @@ enum cam_cdm_hw_version {
 	CAM_CDM_VERSION_2_0 = 0x20000000,
 	CAM_CDM_VERSION_2_1 = 0x20010000,
 	CAM_CDM_VERSION_2_2 = 0x20020000,
+	CAM_CDM_VERSION_3_0 = 0x30000000,
+	CAM_CDM_VERSION_3_1 = 0x30010000,
 	CAM_CDM_VERSION_MAX,
 };
 

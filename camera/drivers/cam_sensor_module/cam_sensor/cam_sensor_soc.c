@@ -323,6 +323,8 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 	else
 		s_ctrl->hw_no_ops = true;
 
+	s_ctrl->aon_pmic_bridge_required = false;
+
 	return rc;
 
 FREE_SENSOR_DATA:

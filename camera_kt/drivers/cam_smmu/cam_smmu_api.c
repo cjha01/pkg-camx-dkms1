@@ -1902,6 +1902,7 @@ int cam_smmu_reserve_sec_heap(int32_t smmu_hdl,
 	iommu_cb_set.cb_info[idx].is_secheap_allocated = true;
 	*iova = (uint32_t)sec_heap_iova;
 	*request_len = sec_heap_iova_len;
+	iommu_cb_set.cb_info[idx].secheap_info.mapped_iova_len = size;
 	mutex_unlock(&iommu_cb_set.cb_info[idx].lock);
 
 	return rc;
@@ -1925,7 +1926,7 @@ int cam_smmu_release_sec_heap(int32_t smmu_hdl)
 	int idx;
 	size_t size = 0;
 	uint32_t sec_heap_iova = 0;
-	size_t sec_heap_iova_len = 0;
+	size_t sec_heap_iova_len = 0, unmap_len = 0;
 	struct secheap_buf_info *secheap_buf = NULL;
 
 	idx = GET_SMMU_TABLE_IDX(smmu_hdl);
@@ -1952,13 +1953,18 @@ int cam_smmu_release_sec_heap(int32_t smmu_hdl)
 	sec_heap_iova = iommu_cb_set.cb_info[idx].secheap_info.iova_start;
 	sec_heap_iova_len = iommu_cb_set.cb_info[idx].secheap_info.iova_len;
 
-	size = iommu_unmap(iommu_cb_set.cb_info[idx].domain,
-		sec_heap_iova,
-		sec_heap_iova_len);
-	if (size != sec_heap_iova_len) {
-		CAM_ERR(CAM_SMMU, "Failed: Unmapped = %zu, requested = %zu",
-			size,
-			sec_heap_iova_len);
+	unmap_len = iommu_cb_set.cb_info[idx].secheap_info.mapped_iova_len ?
+		iommu_cb_set.cb_info[idx].secheap_info.mapped_iova_len : sec_heap_iova_len;
+
+	if (unmap_len) {
+		size = iommu_unmap(iommu_cb_set.cb_info[idx].domain,
+			sec_heap_iova,
+			unmap_len);
+		if (size != unmap_len) {
+			CAM_ERR(CAM_SMMU, "Failed: Unmapped = %zu, requested = %zu",
+				size,
+				unmap_len);
+		}
 	}
 
 	dma_buf_unmap_attachment(secheap_buf->attach,
@@ -1966,6 +1972,7 @@ int cam_smmu_release_sec_heap(int32_t smmu_hdl)
 	dma_buf_detach(secheap_buf->buf, secheap_buf->attach);
 	dma_buf_put(secheap_buf->buf);
 	iommu_cb_set.cb_info[idx].is_secheap_allocated = false;
+	iommu_cb_set.cb_info[idx].secheap_info.mapped_iova_len = 0;
 	mutex_unlock(&iommu_cb_set.cb_info[idx].lock);
 
 	return 0;
@@ -3823,6 +3830,7 @@ static int cam_smmu_get_memory_regions_info(struct device_node *of_node,
 			cb->secheap_support = 1;
 			cb->secheap_info.iova_start = region_start;
 			cb->secheap_info.iova_len = region_len;
+			cb->secheap_info.mapped_iova_len = 0;
 			break;
 		case CAM_SMMU_REGION_QDSS:
 			cb->qdss_support = 1;

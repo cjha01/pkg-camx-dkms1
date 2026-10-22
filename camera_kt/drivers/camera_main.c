@@ -33,6 +33,7 @@
 #include "cam_hdmi_bdg_core.h"
 #include "cam_dp_bdg_core.h"
 #include "cam_ir_led_dev.h"
+#include "cam_lens_driver_dev.h"
 
 #if IS_REACHABLE(CONFIG_LEDS_QPNP_FLASH_V2) || \
 	IS_REACHABLE(CONFIG_LEDS_QTI_FLASH)
@@ -134,6 +135,7 @@ static const struct camera_submodule_component camera_sensor[] = {
 	{&cam_flash_init_module, &cam_flash_exit_module},
 #endif
 	{&cam_ir_led_init_module, &cam_ir_led_exit_module},
+	{&cam_lens_driver_init, &cam_lens_driver_exit},
 #endif
 };
 

@@ -1116,6 +1116,14 @@ static struct cam_ife_csid_ver2_path_reg_info
 		.epoch1_shift_val               = 0,
 };
 
+static struct cam_ife_csid_top_debug_mask cam_ife_csid_lite_690_top_debug_mask = {
+	.evt_bitmap = { 0ULL, },
+};
+
+static struct cam_ife_csid_rx_debug_mask cam_ife_csid_lite_690_rx_debug_mask = {
+	.evt_bitmap = { 0ULL, },
+};
+
 static struct cam_ife_csid_ver2_reg_info cam_ife_csid_lite_690_reg_info = {
 	.top_irq_reg_info      = &cam_ife_csid_lite_690_top_irq_reg_info,
 	.rx_irq_reg_info       = &cam_ife_csid_lite_690_rx_irq_reg_info,
@@ -1142,6 +1150,8 @@ static struct cam_ife_csid_ver2_reg_info cam_ife_csid_lite_690_reg_info = {
 	.rx_irq_desc        = &cam_ife_csid_lite_690_rx_irq_desc,
 	.path_irq_desc      = cam_ife_csid_lite_690_path_irq_desc,
 	.num_top_err_irqs   = cam_ife_csid_690_lite_num_top_regs,
+	.top_debug_mask     = &cam_ife_csid_lite_690_top_debug_mask,
+	.rx_debug_mask      = &cam_ife_csid_lite_690_rx_debug_mask,
 	.num_top_regs       = 1,
 	.num_rx_regs        = 1,
 };

@@ -9,6 +9,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/of_device.h>
 #include <linux/timer.h>
+#include <linux/firmware.h>
 #include "a5_core.h"
 #include "a5_soc.h"
 #include "cam_io_util.h"
@@ -211,6 +212,13 @@ static void cam_a5_component_unbind(struct device *dev,
 	cam_cpas_unregister_client(core_info->cpas_handle);
 	cam_a5_deinit_soc_resources(&a5_dev->soc_info);
 	memset(&cam_a5_soc_info, 0, sizeof(struct a5_soc_info));
+
+	if (core_info->fw_cache.loaded && core_info->fw_cache.fw) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+		core_info->fw_cache.loaded = false;
+	}
+
 	kfree(a5_dev->core_info);
 	a5_dev->core_info = NULL;
 	kfree(a5_dev);

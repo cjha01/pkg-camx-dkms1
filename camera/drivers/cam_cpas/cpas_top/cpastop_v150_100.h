@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018, The Linux Foundation. All rights reserved.
- * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CPASTOP_V150_100_H_
@@ -533,6 +533,7 @@ static struct cam_cpas_info cam150_cpas100_cpas_info = {
 		.num_caps_registers = 1,
 		.hw_caps_offsets = {0x8},
 	},
+	.target_name = "qcs615",
 };
 
 #endif /* _CPASTOP_V150_100_H_ */

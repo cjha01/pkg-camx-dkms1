@@ -1144,5 +1144,6 @@ static struct cam_cpas_info cam696_cpas100_cpas_info = {
 	},
 	.qchannel_info = {&cam696_cpas100_qchannel_info},
 	.num_qchannel = 1,
+	.target_name = "glymur",
 };
 #endif /* _CPASTOP_V696_100_H_ */

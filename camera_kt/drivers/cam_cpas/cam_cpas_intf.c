@@ -208,6 +208,39 @@ int cam_cpas_get_cpas_hw_version(uint32_t *hw_version)
 	return 0;
 }
 
+int cam_cpas_get_target_name(const char **target_name)
+{
+	struct cam_hw_info *cpas_hw = NULL;
+	struct cam_cpas *cpas_core = NULL;
+
+	if (!CAM_CPAS_INTF_INITIALIZED()) {
+		CAM_ERR(CAM_CPAS, "cpas intf not initialized");
+		return -ENODEV;
+	}
+
+	if (!target_name) {
+		CAM_ERR(CAM_CPAS, "invalid input %pK", target_name);
+		return -EINVAL;
+	}
+
+	cpas_hw = (struct cam_hw_info  *) g_cpas_intf->hw_intf->hw_priv;
+	cpas_core = (struct cam_cpas *)cpas_hw->core_info;
+	if (!cpas_core) {
+		CAM_ERR(CAM_CPAS, "cpas core is null");
+		return -EINVAL;
+	}
+
+	if (!cpas_core->target_name || !cpas_core->target_name[0]) {
+		CAM_WARN(CAM_CPAS, "target name is not populated");
+		return -ENOENT;
+	}
+
+	*target_name = cpas_core->target_name;
+	CAM_DBG(CAM_CPAS, "derived target name: %s", *target_name);
+
+	return 0;
+}
+
 int cam_cpas_get_camnoc_fifo_fill_level_info(
 	uint32_t cpas_version,
 	uint32_t client_handle)

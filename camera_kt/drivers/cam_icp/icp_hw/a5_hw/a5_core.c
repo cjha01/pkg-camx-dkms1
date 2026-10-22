@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/slab.h>
@@ -189,6 +189,8 @@ static int32_t cam_a5_download_fw(void *device_priv)
 	struct cam_a5_device_hw_info *hw_info = NULL;
 	struct platform_device         *pdev = NULL;
 	struct a5_soc_info *cam_a5_soc_info = NULL;
+	struct cam_icp_fw_candidate candidates[ICP_FW_MAX_CANDIDATES];
+	int num_candidates;
 
 	if (!device_priv) {
 		CAM_ERR(CAM_ICP, "Invalid cam_dev_info");
@@ -201,31 +203,34 @@ static int32_t cam_a5_download_fw(void *device_priv)
 	pdev = soc_info->pdev;
 	cam_a5_soc_info = soc_info->soc_private;
 
-	if (cam_a5_soc_info->fw_name) {
-		CAM_INFO(CAM_ICP, "Downloading firmware %s",
-			cam_a5_soc_info->fw_name);
-		rc = request_firmware(&core_info->fw_elf,
-				cam_a5_soc_info->fw_name, &pdev->dev);
-		if (rc) {
-			CAM_ERR(CAM_ICP, "Failed to locate fw: %d", rc);
+	if (!core_info->fw_cache.loaded) {
+		num_candidates = cam_icp_get_fw_candidates(cam_a5_soc_info->fw_name,
+			".elf", candidates, ARRAY_SIZE(candidates));
+		if (num_candidates < 0) {
+			CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
+					num_candidates);
+			return num_candidates;
+		}
+
+		rc = cam_icp_request_fw_from_candidates(&pdev->dev,
+			candidates, num_candidates, &core_info->fw_cache.fw);
+		if (rc < 0) {
+			CAM_ERR(CAM_ICP, "Failed to locate firmware");
 			return rc;
 		}
+		CAM_INFO(CAM_ICP, "[%s] Loaded ELF firmware from disk", soc_info->dev_name);
 	} else {
-		rc = request_firmware(&core_info->fw_elf,
-				"CAMERA_ICP.elf", &pdev->dev);
-		if (rc) {
-			CAM_ERR(CAM_ICP, "Failed to locate fw: %d", rc);
-			return rc;
-		}
+		CAM_INFO(CAM_ICP, "[%s] Reusing cached ELF firmware, skipping disk read",
+			soc_info->dev_name);
 	}
 
-	if (!core_info->fw_elf) {
+	if (!core_info->fw_cache.fw) {
 		CAM_ERR(CAM_ICP, "Invalid elf size");
 		rc = -EINVAL;
 		goto fw_download_failed;
 	}
 
-	fw_start = core_info->fw_elf->data;
+	fw_start = core_info->fw_cache.fw->data;
 	rc = cam_icp_validate_fw(fw_start);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "fw elf validation failed");
@@ -251,8 +256,13 @@ static int32_t cam_a5_download_fw(void *device_priv)
 		goto fw_download_failed;
 	}
 
+	core_info->fw_cache.loaded = true;
+
 fw_download_failed:
-	release_firmware(core_info->fw_elf);
+	if (rc && core_info->fw_cache.fw && !core_info->fw_cache.loaded) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+	}
 	return rc;
 }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/slab.h>
@@ -27,6 +27,7 @@
 #include "cam_debug_util.h"
 #include "cam_icp_proc_common.h"
 #include "cam_common_util.h"
+#include "cam_icp_util.h"
 #include "cam_compat.h"
 #include "cam_icp_soc_common.h"
 
@@ -49,11 +50,13 @@ static int32_t cam_icp_v1_download_fw(void *device_priv)
 {
 	int32_t rc = 0;
 	uint32_t fw_size;
+	int num_candidates;
 	const uint8_t *fw_start = NULL;
 	struct cam_hw_info *icp_v1_dev = device_priv;
 	struct cam_hw_soc_info *soc_info = NULL;
 	struct cam_icp_v1_device_core_info *core_info = NULL;
 	struct platform_device         *pdev = NULL;
+	struct cam_icp_fw_candidate candidates[ICP_FW_MAX_CANDIDATES];
 	const char                     *firmware_name = NULL;
 
 	if (!device_priv) {
@@ -66,33 +69,36 @@ static int32_t cam_icp_v1_download_fw(void *device_priv)
 	pdev = soc_info->pdev;
 
 	rc = of_property_read_string(pdev->dev.of_node, "fw_name", &firmware_name);
-	if (rc) {
-		CAM_INFO(CAM_ICP,
-			"FW image name not found. Use default name: CAMERA_ICP.elf");
-		rc = firmware_request_nowarn(&core_info->fw_elf,
-			"CAMERA_ICP.elf", &pdev->dev);
-		if (rc) {
-			CAM_ERR(CAM_ICP, "Failed to locate fw: %d", rc);
+
+	if (!core_info->fw_cache.loaded) {
+		num_candidates = cam_icp_get_fw_candidates(firmware_name,
+			".elf", candidates, ARRAY_SIZE(candidates));
+		if (num_candidates < 0) {
+			CAM_ERR(CAM_ICP, "Failed to get firmware candidates %d",
+					num_candidates);
+			return num_candidates;
+		}
+
+		rc = cam_icp_request_fw_from_candidates(&pdev->dev,
+			candidates, num_candidates, &core_info->fw_cache.fw);
+		if (rc < 0) {
+			CAM_ERR(CAM_ICP, "Failed to locate firmware");
 			return rc;
 		}
+
+		CAM_INFO(CAM_ICP, "[%s] Loaded ELF firmware from disk", soc_info->dev_name);
 	} else {
-		CAM_INFO(CAM_ICP, "Downloading firmware %s",
-			firmware_name);
-		rc = firmware_request_nowarn(&core_info->fw_elf,
-			firmware_name, &pdev->dev);
-		if (rc) {
-			CAM_ERR(CAM_ICP, "Failed to locate fw: %d", rc);
-			return rc;
-		}
+		CAM_INFO(CAM_ICP, "[%s] Reusing cached ELF firmware, skipping disk read",
+			soc_info->dev_name);
 	}
 
-	if (!core_info->fw_elf) {
+	if (!core_info->fw_cache.fw) {
 		CAM_ERR(CAM_ICP, "Invalid elf size");
 		rc = -EINVAL;
 		goto fw_download_failed;
 	}
 
-	fw_start = core_info->fw_elf->data;
+	fw_start = core_info->fw_cache.fw->data;
 	rc = cam_icp_validate_fw(fw_start, EM_ARM);
 	if (rc) {
 		CAM_ERR(CAM_ICP, "fw elf validation failed");
@@ -118,8 +124,13 @@ static int32_t cam_icp_v1_download_fw(void *device_priv)
 		goto fw_download_failed;
 	}
 
+	core_info->fw_cache.loaded = true;
+
 fw_download_failed:
-	release_firmware(core_info->fw_elf);
+	if (rc && core_info->fw_cache.fw && !core_info->fw_cache.loaded) {
+		release_firmware(core_info->fw_cache.fw);
+		core_info->fw_cache.fw = NULL;
+	}
 	return rc;
 }
 

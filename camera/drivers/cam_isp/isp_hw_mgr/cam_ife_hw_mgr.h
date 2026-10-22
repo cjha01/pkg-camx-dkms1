@@ -68,6 +68,7 @@ enum cam_ife_ctx_master_type {
  * @enable_cdm_cmd_check:      Enable invalid command check in cmd_buf
  * @disable_line_based_mode:   Disable line based mode for per port
  *                             feature with duplicate sensors
+ * @enable_cdr_sweep_debug:    If CDR sweep for CSIPHY is enabled
  */
 struct cam_ife_hw_mgr_debug {
 	struct dentry  *dentry;
@@ -92,6 +93,7 @@ struct cam_ife_hw_mgr_debug {
 	bool           enable_presil_reg_dump;
 	bool           enable_cdm_cmd_check;
 	bool           disable_line_based_mode;
+	bool           enable_cdr_sweep_debug;
 };
 
 /**
@@ -262,6 +264,12 @@ struct cam_ife_mgr_bw_data {
 	uint32_t framerate;
 };
 
+enum cam_ife_ctx_stop_state {
+	CAM_IFE_CTX_STOP_NONE,
+	CAM_IFE_CTX_STOP_IN_PROGRESS,
+	CAM_IFE_CTX_STOP_DONE,
+};
+
 /* struct cam_ife_hw_mgr_ctx - IFE HW manager Context object
  *
  * concr_ctx:             HW Context currently used from this manager context
@@ -275,7 +283,7 @@ struct cam_ife_mgr_bw_data {
  * in_ports:              context input ports
  * unpacker_fmt:          IFE input unpacker for offline isp
  * is_offline:            indicates if context is used for offline processing
- * stop_done:             indicates if HW stop done for Context
+ * stop_state:            indicates if stop is in progress or completed
  * @virtual_rdi_mapping_cb Callback query for virtual rdi mapping
  *
  */
@@ -291,7 +299,7 @@ struct cam_ife_hw_mgr_ctx {
 	struct cam_isp_in_port_generic_info    *in_ports;
 	uint32_t                                unpacker_fmt;
 	bool                                    is_offline;
-	bool                                    stop_done;
+	enum cam_ife_ctx_stop_state             stop_state;
 	cam_hw_get_virtual_rdi_mapping_cb_func  virtual_rdi_mapping_cb;
 };
 
@@ -552,6 +560,7 @@ struct cam_ife_mgr_offline_in_queue {
  * @num_ife_perf_counters :  max ife perf counters supported
  * @num_sfe_perf_counters :  max sfe perf counters supported
  * @support_consumed_addr :  indicate whether hw supports last consumed address
+ * @skip_regdump_data     :  ISP skip reg dump data
  */
 struct cam_isp_ife_sfe_hw_caps {
 	uint32_t     max_vfe_out_res_type;
@@ -559,6 +568,7 @@ struct cam_isp_ife_sfe_hw_caps {
 	uint32_t     num_ife_perf_counters;
 	uint32_t     num_sfe_perf_counters;
 	bool         support_consumed_addr;
+	struct cam_isp_hw_regiter_dump_data skip_regdump_data;
 };
 
 /*
@@ -951,6 +961,8 @@ int cam_ife_hw_mgr_get_res(struct list_head *src_list, struct cam_isp_hw_mgr_res
 int cam_ife_hw_mgr_event_handler(void *priv, uint32_t evt_id, void *evt_info);
 int cam_ife_hw_mgr_put_res(struct list_head *src_list, struct cam_isp_hw_mgr_res  **res);
 int cam_ife_hw_mgr_is_rdi_res(uint32_t res_id);
+bool cam_ife_hw_mgr_is_csid_rdi_path(uint32_t res_id);
+bool cam_ife_hw_mgr_is_virtual_rdi_out_res(uint32_t res_id);
 bool cam_isp_is_ctx_primary_rdi(struct cam_ife_hw_mgr_ctx  *ctx);
 bool cam_ife_hw_mgr_is_ife_out_port(uint32_t res_id);
 bool cam_ife_hw_mgr_check_path_port_compat(uint32_t in_type, uint32_t out_type);
