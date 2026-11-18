@@ -1,9 +1,10 @@
-camx-dkms (1.0.9-0qli2) UNRELEASED; urgency=medium
+camx-dkms (1.0.9-0qli2) resolute; urgency=medium
 
+  [ CamX Maintainers ]
   * debian: Build against the kernel tree dkms selects.
   * debian: dkms-build: Do not let the target loop replace ARCH.
 
- -- CamX Maintainers <camx.maintainers@qti.qualcomm.com>  Wed, 18 Nov 2026 18:04:26 +0000
+ -- GitHub Service Bot <githubservice@qti.qualcomm.com>  Wed, 18 Nov 2026 18:14:53 +0000
 
 camx-dkms (1.0.9-0qli1) resolute; urgency=medium
 
